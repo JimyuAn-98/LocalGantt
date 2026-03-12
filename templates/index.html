@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>甘特图项目管理工具</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <!-- 本地缓存的 FontAwesome 图标和甘特图库样式 -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='lib/font-awesome.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='lib/frappe-gantt.css') }}">
+</head>
+<body>
+    <div class="app-container">
+        <!-- 顶部工具栏 -->
+        <header class="app-header">
+            <div class="header-left">
+                <h1 class="app-title">甘特图项目管理工具</h1>
+                <div class="project-selector">
+                    <select id="project-select" class="project-dropdown">
+                        <option value="">选择项目...</option>
+                    </select>
+                    <button id="new-project-btn" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> 新建项目
+                    </button>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="view-controls">
+                    <button class="btn btn-icon" data-view="day" title="日视图">
+                        <i class="fas fa-calendar-day"></i> 日
+                    </button>
+                    <button class="btn btn-icon active" data-view="week" title="周视图">
+                        <i class="fas fa-calendar-week"></i> 周
+                    </button>
+                    <button class="btn btn-icon" data-view="month" title="月视图">
+                        <i class="fas fa-calendar-alt"></i> 月
+                    </button>
+                </div>
+                <button id="export-btn" class="btn btn-secondary">
+                    <i class="fas fa-download"></i> 导出图片
+                </button>
+                <button id="save-btn" class="btn btn-success">
+                    <i class="fas fa-save"></i> 保存
+                </button>
+                <button id="critical-path-btn" class="btn btn-warning">
+                    <i class="fas fa-project-diagram"></i> 关键路径
+                </button>
+            </div>
+        </header>
+
+        <!-- 主内容区域 -->
+        <main class="app-main">
+            <!-- 左侧任务树面板 -->
+            <aside class="task-tree-panel">
+                <div class="panel-header">
+                    <h3>任务列表</h3>
+                    <button id="add-task-btn" class="btn btn-sm btn-primary">
+                        <i class="fas fa-plus"></i> 添加任务
+                    </button>
+                </div>
+                <div class="task-tree-container">
+                    <div id="task-tree" class="task-tree">
+                        <!-- 任务树将通过JavaScript动态生成 -->
+                        <div class="empty-state">
+                            <i class="fas fa-tasks"></i>
+                            <p>暂无任务，请先创建项目或添加任务</p>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- 右侧甘特图区域 -->
+            <section class="gantt-panel">
+                <div class="panel-header">
+                    <h3>甘特图</h3>
+                    <div class="gantt-controls">
+                        <button id="zoom-in-btn" class="btn btn-sm btn-icon" title="放大">
+                            <i class="fas fa-search-plus"></i>
+                        </button>
+                        <button id="zoom-out-btn" class="btn btn-sm btn-icon" title="缩小">
+                            <i class="fas fa-search-minus"></i>
+                        </button>
+                        <button id="today-btn" class="btn btn-sm btn-secondary" title="跳转到今天">
+                            <i class="fas fa-calendar-check"></i> 今天
+                        </button>
+                    </div>
+                </div>
+                <div class="gantt-container">
+                    <div id="gantt-chart"></div>
+                </div>
+            </section>
+        </main>
+
+        <!-- 任务编辑侧边栏（默认隐藏） -->
+        <aside class="edit-sidebar" id="edit-sidebar">
+            <div class="sidebar-header">
+                <h3>编辑任务</h3>
+                <button class="btn btn-icon close-sidebar">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="sidebar-content">
+                <form id="task-form">
+                    <input type="hidden" id="task-id">
+                    <input type="hidden" id="task-project-id">
+                    
+                    <div class="form-group">
+                        <label for="task-name">任务名称</label>
+                        <input type="text" id="task-name" class="form-control" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="task-description">描述</label>
+                        <textarea id="task-description" class="form-control" rows="3"></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="task-assignee">负责人</label>
+                        <input type="text" id="task-assignee" class="form-control">
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="task-start-date">开始日期</label>
+                            <input type="date" id="task-start-date" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="task-end-date">结束日期</label>
+                            <input type="date" id="task-end-date" class="form-control" required>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="task-duration">工期（天）</label>
+                        <input type="number" id="task-duration" class="form-control" min="1" readonly>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="task-progress">进度 (%)</label>
+                        <input type="range" id="task-progress" class="form-control-range" min="0" max="100" step="5">
+                        <span id="progress-value">0%</span>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="task-color">颜色</label>
+                        <input type="color" id="task-color" class="form-control" value="#3498db" title="选择任务颜色">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="task-parent">父任务</label>
+                        <select id="task-parent" class="form-control">
+                            <option value="">无（顶级任务）</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="task-dependencies">前置任务</label>
+                        <select id="task-dependencies" class="form-control" multiple>
+                            <!-- 前置任务选项将通过JavaScript动态生成 -->
+                        </select>
+                        <small class="form-text">按住 Ctrl 键可多选</small>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">保存任务</button>
+                        <button type="button" id="delete-task-btn" class="btn btn-danger">删除任务</button>
+                        <button type="button" class="btn btn-secondary close-sidebar">取消</button>
+                    </div>
+                </form>
+            </div>
+        </aside>
+
+        <!-- 依赖关系创建提示（连接线模式） -->
+        <div class="dependency-mode" id="dependency-mode" style="display: none;">
+            <div class="dependency-mode-indicator">
+                <i class="fas fa-link"></i>
+                <span>连接线模式：点击一个任务作为前置任务，再点击另一个任务作为后继任务</span>
+                <button id="cancel-dependency-btn" class="btn btn-sm btn-secondary">取消</button>
+            </div>
+        </div>
+
+        <!-- 加载遮罩 -->
+        <div class="loading-overlay" id="loading-overlay">
+            <div class="loading-spinner">
+                <i class="fas fa-spinner fa-spin"></i>
+                <p>加载中...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript 文件 -->
+    <!-- 本地缓存的甘特图库脚本 -->
+    <script src="{{ url_for('static', filename='lib/frappe-gantt.min.js') }}"></script>
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/gantt.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/tree.js') }}"></script>
+</body>
+</html>
