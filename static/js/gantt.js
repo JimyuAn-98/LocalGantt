@@ -172,7 +172,7 @@ class GanttManager {
                 ganttMode = 'Month';
                 break;
             default:
-                ganttMode = 'Week';
+                ganttMode = 'Day';
         }
         this.gantt.change_view_mode(ganttMode);
     }
