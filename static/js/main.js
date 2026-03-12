@@ -229,7 +229,49 @@ class GanttApp {
     convertToGanttTasks(tasks) {
         // generate style block for custom colors
         this.applyTaskColors(tasks);
-        return tasks.map(task => {
+        
+        // 构建任务映射和父子关系
+        const taskMap = new Map();
+        const childrenMap = new Map();
+        
+        tasks.forEach(task => {
+            taskMap.set(task.id, task);
+            childrenMap.set(task.id, []);
+        });
+        
+        tasks.forEach(task => {
+            if (task.parent_id) {
+                const children = childrenMap.get(task.parent_id) || [];
+                children.push(task);
+                childrenMap.set(task.parent_id, children);
+            }
+        });
+        
+        // 按父子关系排序任务
+        const sortedTasks = [];
+        const addTaskAndChildren = (taskId) => {
+            const task = taskMap.get(taskId);
+            if (task) {
+                sortedTasks.push(task);
+                // 添加子任务
+                const children = childrenMap.get(taskId) || [];
+                // 按开始日期排序子任务
+                children.sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
+                children.forEach(child => {
+                    addTaskAndChildren(child.id);
+                });
+            }
+        };
+        
+        // 先添加根任务（没有父任务的任务）
+        const rootTasks = tasks.filter(task => !task.parent_id);
+        // 按开始日期排序根任务
+        rootTasks.sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
+        rootTasks.forEach(task => {
+            addTaskAndChildren(task.id);
+        });
+        
+        return sortedTasks.map(task => {
             const cls = task.has_children ? 'summary-task' : '';
             // add color-specific class
             const colorClass = `task-color-${task.id}`;

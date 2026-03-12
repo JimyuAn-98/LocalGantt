@@ -203,15 +203,9 @@ class TaskTreeManager {
     
     // 高亮甘特图中的任务
     highlightGanttTask(taskId) {
-        // 移除之前的高亮
-        document.querySelectorAll('.bar-wrapper').forEach(wrapper => {
-            wrapper.style.boxShadow = '';
-        });
-        
-        // 添加新高亮
-        const ganttBar = document.querySelector(`.bar-wrapper[data-id="${taskId}"]`);
-        if (ganttBar) {
-            ganttBar.style.boxShadow = '0 0 0 2px #3498db';
+        // 调用甘特图管理器的setSelectedTask方法
+        if (window.ganttChart) {
+            window.ganttChart.setSelectedTask(taskId);
         }
     }
     

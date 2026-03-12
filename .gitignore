@@ -2,3 +2,6 @@
 /.vscode
 /gantt.db
 /__pycache__
+/routes/__pycache__
+*.db
+*.py[cod]

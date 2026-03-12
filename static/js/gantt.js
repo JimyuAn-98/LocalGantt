@@ -7,9 +7,35 @@ class GanttManager {
         this.criticalTaskIds = new Set();
         this.dependencyMode = false;
         this.dependencySourceTaskId = null;
+        this.selectedTaskId = null;
         
         // defer actual instantiation until we have some tasks or when update is called
         // so empty projects won't trigger library errors
+    }
+    
+    // 设置选中的任务
+    setSelectedTask(taskId) {
+        this.selectedTaskId = taskId;
+        this.highlightTask(taskId);
+    }
+    
+    // 高亮任务
+    highlightTask(taskId) {
+        // 移除之前的高亮
+        document.querySelectorAll('.bar-wrapper').forEach(wrapper => {
+            wrapper.style.boxShadow = '';
+            wrapper.style.backgroundColor = '';
+        });
+        
+        // 确保taskId是字符串格式，与甘特图中的data-id保持一致
+        if (taskId) {
+            const taskIdStr = taskId.toString();
+            const ganttBar = document.querySelector(`.bar-wrapper[data-id="${taskIdStr}"]`);
+            if (ganttBar) {
+                ganttBar.style.boxShadow = '0 0 0 3px #3498db';
+                ganttBar.style.backgroundColor = 'rgba(52, 152, 219, 0.1)';
+            }
+        }
     }
     
     init(tasks = []) {
@@ -51,6 +77,8 @@ class GanttManager {
             this.gantt.refresh(tasks.length ? tasks : []);
         }
         this.applyCriticalPathHighlight();
+        // 重新应用任务高亮
+        this.highlightTask(this.selectedTaskId);
     }
     
     // 日期变化回调（拖拽任务条）

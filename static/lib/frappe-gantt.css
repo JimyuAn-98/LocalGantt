@@ -23,7 +23,12 @@
 
 .gantt .today-highlight {
   fill: #fcf8e3;
-  opacity: 0.5; }
+  opacity: 0.8;
+  stroke: #f39c12;
+  stroke-width: 2;
+  stroke-dasharray: 2;
+  z-index: 1;
+}
 
 .gantt .arrow {
   fill: none;
