@@ -78,7 +78,7 @@
    ```
 
 5. **访问应用**
-   打开浏览器，访问：http://localhost:5000
+   打开浏览器，访问：http://localhost:1258
 
 ## 使用指南
 
@@ -206,7 +206,7 @@ gantt/
 1. **应用无法启动**
    - 检查Python版本（需要3.7+）
    - 检查依赖是否安装完整：`pip install -r requirements.txt`
-   - 检查端口5000是否被占用
+   - 检查端口1258是否被占用
 
 2. **数据库问题**
    - 删除`data/gantt.db`文件重新启动应用
@@ -232,10 +232,6 @@ gantt/
 4. **报表生成**：项目进度报告、资源利用率统计
 5. **离线支持**：使用IndexedDB或LocalStorage实现离线编辑
 
-## 许可证
-
-本项目采用 MIT 许可证。详见 [LICENSE](LICENSE) 文件。
-
 ## 贡献指南
 
 欢迎提交Issue和Pull Request来改进本项目。
@@ -250,8 +246,7 @@ gantt/
 
 如有问题或建议，请通过以下方式联系：
 - 提交 GitHub Issue
-- 发送邮件至 [your-email@example.com]
 
 ---
 
-**开始使用**：安装依赖后运行 `python app.py`，打开浏览器访问 http://localhost:5000
+**开始使用**：安装依赖后运行 `python app.py`，打开浏览器访问 http://localhost:1258
