@@ -113,6 +113,21 @@ body {
     gap: 20px;
 }
 
+.app-logo {
+    height: 40px;           /* 固定高度，宽度自动等比缩放 */
+    width: auto;            /* 保持原始宽高比，防止变形 */
+    object-fit: contain;    /* 确保整个图片在指定尺寸内完整显示 */
+    vertical-align: middle; /* 与标题垂直居中对齐 */
+    margin-right: 12px;     /* 与右侧标题保持适当间距 */
+}
+
+/* 可选：针对小屏幕设备的响应式调整 */
+@media (max-width: 768px) {
+    .app-logo {
+        height: 32px;       /* 小屏幕上适当缩小 */
+    }
+}
+
 .app-title {
     font-size: 20px;
     font-weight: 600;

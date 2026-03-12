@@ -3,18 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>甘特图项目管理工具</title>
+    <title>Ganπ项目管理工具</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <!-- 本地缓存的 FontAwesome 图标和甘特图库样式 -->
     <link rel="stylesheet" href="{{ url_for('static', filename='lib/font-awesome.min.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='lib/frappe-gantt.css') }}">
+
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='image/apple-touch-icon.png') }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='image/favicon-32x32.png') }}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='image/favicon-16x16.png') }}">
+    <link rel="manifest" href="{{ url_for('static', filename='image/site.webmanifest') }}">
 </head>
 <body>
     <div class="app-container">
         <!-- 顶部工具栏 -->
         <header class="app-header">
             <div class="header-left">
-                <h1 class="app-title">甘特图项目管理工具</h1>
+                <div class="logo-container">
+                    <img src="{{ url_for('static', filename='image/logo.png') }}" alt="网站Logo" class="app-logo">
+                    <h1 class="app-title">项目管理工具</h1>
+                </div>
                 <div class="project-selector">
                     <select id="project-select" class="project-dropdown">
                         <option value="">选择项目...</option>

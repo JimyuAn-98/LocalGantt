@@ -110,6 +110,15 @@ class TaskTreeManager {
         if (task.progress < 30) progressColor = '#e74c3c'; // 红色
         else if (task.progress < 70) progressColor = '#f39c12'; // 黄色
         
+        // 多项目视图时显示项目名称
+        let projectBadge = '';
+        if (window.ganttApp && window.ganttApp.currentProjectId === 'all' && task.project_id) {
+            const project = window.ganttApp.projects.find(p => p.id === task.project_id);
+            if (project) {
+                projectBadge = `<span class="project-badge" style="font-size: 10px; padding: 1px 6px; border-radius: 3px; background-color: ${project.color || '#3498db'}; color: white; margin-left: 6px;">${project.name}</span>`;
+            }
+        }
+        
         // 构建HTML
         let html = `
             <div class="task-node ${isSelected ? 'selected' : ''}" data-task-id="${taskId}" style="margin-left: ${indent}px">
@@ -119,6 +128,7 @@ class TaskTreeManager {
                             <i class="fas fa-chevron-${isExpanded ? 'down' : 'right'} expand-icon" style="margin-right: 6px; cursor: pointer; font-size: 12px;"></i>
                         ` : '<span style="display: inline-block; width: 18px;"></span>'}
                         <span class="task-name">${task.name}</span>
+                        ${projectBadge}
                         ${task.assignee ? `<span class="task-assignee" style="font-size: 11px; color: #7f8c8d; margin-left: 8px;">(${task.assignee})</span>` : ''}
                     </div>
                     <div class="task-node-progress" style="color: ${progressColor}">

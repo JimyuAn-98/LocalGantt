@@ -8,6 +8,7 @@ class Project(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     description = db.Column(db.Text, default='')
+    color = db.Column(db.String(7), default='#3498db')  # hex color for project
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     tasks = db.relationship('Task', backref='project', lazy=True, cascade='all, delete-orphan')
 
@@ -16,6 +17,7 @@ class Project(db.Model):
             'id': self.id,
             'name': self.name,
             'description': self.description,
+            'color': self.color or '#3498db',
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'task_count': len(self.tasks)
         }

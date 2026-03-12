@@ -1,7 +1,28 @@
 from flask import Blueprint, request, jsonify
+import random
 from models import db, Project
 
 projects_bp = Blueprint('projects', __name__)
+
+# 预定义的项目颜色列表
+PROJECT_COLORS = [
+    '#3498db',  # 蓝色
+    '#e74c3c',  # 红色
+    '#2ecc71',  # 绿色
+    '#f39c12',  # 橙色
+    '#9b59b6',  # 紫色
+    '#1abc9c',  # 青色
+    '#e91e63',  # 粉色
+    '#ff5722',  # 深橙色
+    '#795548',  # 棕色
+    '#607d8b',  # 蓝灰色
+    '#3f51b5',  # 靛蓝色
+    '#009688',  # 蓝绿色
+]
+
+def get_random_color():
+    """获取随机项目颜色"""
+    return random.choice(PROJECT_COLORS)
 
 @projects_bp.route('/', methods=['GET'])
 def get_projects():
@@ -16,7 +37,8 @@ def create_project():
     
     project = Project(
         name=data['name'],
-        description=data.get('description', '')
+        description=data.get('description', ''),
+        color=data.get('color', get_random_color())
     )
     db.session.add(project)
     db.session.commit()

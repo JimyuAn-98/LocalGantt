@@ -160,17 +160,29 @@ class GanttApp {
     
     updateProjectDropdown() {
         this.projectSelect.innerHTML = '<option value="">选择项目...</option>';
+        // 添加"显示所有项目"选项
+        if (this.projects.length > 0) {
+            const allOption = document.createElement('option');
+            allOption.value = 'all';
+            allOption.textContent = '📊 显示所有项目';
+            this.projectSelect.appendChild(allOption);
+        }
         this.projects.forEach(project => {
             const option = document.createElement('option');
             option.value = project.id;
             option.textContent = `${project.name} (${project.task_count || 0}个任务)`;
+            option.style.color = project.color || '#3498db';
             this.projectSelect.appendChild(option);
         });
     }
     
     async onProjectSelect(event) {
         const projectId = event.target.value;
-        if (projectId) {
+        if (projectId === 'all') {
+            // 显示所有项目的任务
+            this.currentProjectId = 'all';
+            await this.loadAllTasks();
+        } else if (projectId) {
             this.currentProjectId = parseInt(projectId);
             await this.loadProjectTasks();
         } else {
@@ -180,6 +192,26 @@ class GanttApp {
             if (window.ganttChart) {
                 window.ganttChart.update([]);
             }
+        }
+    }
+    
+    // 加载所有项目的任务
+    async loadAllTasks() {
+        try {
+            const tasks = await this.apiRequest('/api/tasks/all');
+            this.tasks = tasks;
+            this.updateTaskTree(tasks);
+            
+            // 更新甘特图
+            if (window.ganttChart) {
+                const ganttTasks = this.convertToGanttTasks(tasks);
+                window.ganttChart.update(ganttTasks);
+            }
+            
+            // 更新编辑表单中的父任务和依赖选项
+            this.updateTaskFormOptions();
+        } catch (error) {
+            console.error('加载所有任务失败:', error);
         }
     }
     
@@ -290,7 +322,7 @@ class GanttApp {
     updateTaskFormOptions() {
         // 清空选项
         this.taskParentSelect.innerHTML = '<option value="">无（顶级任务）</option>';
-        this.taskDependenciesSelect.innerHTML = '';
+        this.taskDependenciesSelect.innerHTML = '<option value="">无</option>';
         
         // 添加选项（排除当前编辑的任务自身）
         const currentTaskId = parseInt(this.taskIdInput.value) || null;
@@ -318,11 +350,16 @@ class GanttApp {
                 if (currentTask.parent_id) {
                     this.taskParentSelect.value = currentTask.parent_id;
                 }
+                // 设置依赖关系
                 if (currentTask.dependencies && currentTask.dependencies.length > 0) {
                     currentTask.dependencies.forEach(depId => {
                         const option = this.taskDependenciesSelect.querySelector(`option[value="${depId}"]`);
                         if (option) option.selected = true;
                     });
+                } else {
+                    // 如果没有依赖，选中"无"选项
+                    const noneOption = this.taskDependenciesSelect.querySelector('option[value=""]');
+                    if (noneOption) noneOption.selected = true;
                 }
             }
         }
@@ -424,7 +461,8 @@ class GanttApp {
                 
                 // 更新依赖关系
                 const selectedDeps = Array.from(this.taskDependenciesSelect.selectedOptions)
-                    .map(opt => parseInt(opt.value));
+                    .map(opt => parseInt(opt.value))
+                    .filter(id => !isNaN(id)); // 过滤掉空值（"无"选项）
                 await this.updateTaskDependencies(taskId, selectedDeps);
             } else {
                 // 创建新任务
@@ -432,7 +470,8 @@ class GanttApp {
                 
                 // 添加依赖关系
                 const selectedDeps = Array.from(this.taskDependenciesSelect.selectedOptions)
-                    .map(opt => parseInt(opt.value));
+                    .map(opt => parseInt(opt.value))
+                    .filter(id => !isNaN(id)); // 过滤掉空值（"无"选项）
                 for (const depId of selectedDeps) {
                     await this.apiRequest(`/api/tasks/${newTask.id}/dependencies`, 'POST', {
                         predecessor_id: depId
@@ -524,7 +563,15 @@ class GanttApp {
         }
         let css = '';
         tasks.forEach(task => {
-            const color = task.color || '#3498db';
+            // 如果是多项目视图，使用项目颜色；否则使用任务颜色
+            let color;
+            if (this.currentProjectId === 'all' && task.project_id) {
+                // 查找任务所属项目的颜色
+                const project = this.projects.find(p => p.id === task.project_id);
+                color = project ? project.color : '#3498db';
+            } else {
+                color = task.color || '#3498db';
+            }
             const cls = `task-color-${task.id}`;
             css += `.${cls} .bar { fill: ${color}; }\n`;
             css += `.${cls} .bar-label { fill: #fff; }\n`;

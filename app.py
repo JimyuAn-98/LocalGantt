@@ -16,16 +16,29 @@ def create_app():
     # Create tables if they don't exist
     with app.app_context():
         db.create_all()
-        # ensure color column exists on tasks table (simple migration)
+        # ensure color column exists on tasks and projects tables (simple migration)
         from sqlalchemy import inspect, text
         inspector = inspect(db.engine)
-        cols = [c['name'] for c in inspector.get_columns('tasks')] if inspector.has_table('tasks') else []
-        if 'color' not in cols:
-            try:
-                db.engine.execute(text("ALTER TABLE tasks ADD COLUMN color VARCHAR(7) DEFAULT '#3498db'"))
-                print('Added color column to tasks table')
-            except Exception as e:
-                print('Failed to alter tasks table to add color column:', e)
+        
+        # Check tasks table
+        if inspector.has_table('tasks'):
+            task_cols = [c['name'] for c in inspector.get_columns('tasks')]
+            if 'color' not in task_cols:
+                try:
+                    db.engine.execute(text("ALTER TABLE tasks ADD COLUMN color VARCHAR(7) DEFAULT '#3498db'"))
+                    print('Added color column to tasks table')
+                except Exception as e:
+                    print('Failed to alter tasks table to add color column:', e)
+        
+        # Check projects table
+        if inspector.has_table('projects'):
+            project_cols = [c['name'] for c in inspector.get_columns('projects')]
+            if 'color' not in project_cols:
+                try:
+                    db.engine.execute(text("ALTER TABLE projects ADD COLUMN color VARCHAR(7) DEFAULT '#3498db'"))
+                    print('Added color column to projects table')
+                except Exception as e:
+                    print('Failed to alter projects table to add color column:', e)
     
     # Register blueprints (API routes)
     from routes.projects import projects_bp

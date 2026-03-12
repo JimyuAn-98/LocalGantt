@@ -8,6 +8,7 @@ class GanttManager {
         this.dependencyMode = false;
         this.dependencySourceTaskId = null;
         this.selectedTaskId = null;
+        this.lastClickTime = 0; // 用于双击检测
         
         // defer actual instantiation until we have some tasks or when update is called
         // so empty projects won't trigger library errors
@@ -21,21 +22,154 @@ class GanttManager {
     
     // 高亮任务
     highlightTask(taskId) {
-        // 移除之前的高亮
-        document.querySelectorAll('.bar-wrapper').forEach(wrapper => {
-            wrapper.style.boxShadow = '';
-            wrapper.style.backgroundColor = '';
+        // 移除之前的高亮效果
+        document.querySelectorAll('.highlight-shadow').forEach(shadow => {
+            shadow.remove();
+        });
+        
+        // 恢复任务条样式
+        document.querySelectorAll('.bar').forEach(bar => {
+            bar.setAttribute('filter', '');
         });
         
         // 确保taskId是字符串格式，与甘特图中的data-id保持一致
         if (taskId) {
             const taskIdStr = taskId.toString();
-            const ganttBar = document.querySelector(`.bar-wrapper[data-id="${taskIdStr}"]`);
-            if (ganttBar) {
-                ganttBar.style.boxShadow = '0 0 0 3px #3498db';
-                ganttBar.style.backgroundColor = 'rgba(52, 152, 219, 0.1)';
+            // 使用更适合SVG元素的选择方式
+            const ganttBars = document.querySelectorAll('.bar-wrapper');
+            for (let i = 0; i < ganttBars.length; i++) {
+                const wrapper = ganttBars[i];
+                if (wrapper.getAttribute('data-id') === taskIdStr) {
+                    // 获取任务条元素
+                    const barElement = wrapper.querySelector('.bar');
+                    if (barElement) {
+                        // 获取任务条的位置和尺寸
+                        const x = parseFloat(barElement.getAttribute('x'));
+                        const y = parseFloat(barElement.getAttribute('y'));
+                        const width = parseFloat(barElement.getAttribute('width'));
+                        const height = parseFloat(barElement.getAttribute('height'));
+                        const rx = barElement.getAttribute('rx') || '3';
+                        const ry = barElement.getAttribute('ry') || '3';
+                        
+                        // 创建SVG滤镜定义（如果不存在）
+                        this.createShadowFilter();
+                        
+                        // 创建阴影层（在任务条下方）
+                        const shadow = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                        shadow.setAttribute('class', 'highlight-shadow');
+                        shadow.setAttribute('x', x + 3);
+                        shadow.setAttribute('y', y + 3);
+                        shadow.setAttribute('width', width);
+                        shadow.setAttribute('height', height);
+                        shadow.setAttribute('rx', rx);
+                        shadow.setAttribute('ry', ry);
+                        shadow.setAttribute('fill', 'rgba(0, 0, 0, 0.3)');
+                        shadow.setAttribute('pointer-events', 'none');
+                        
+                        // 将阴影添加到bar-group的最前面
+                        const barGroup = wrapper.querySelector('.bar-group');
+                        if (barGroup) {
+                            barGroup.insertBefore(shadow, barGroup.firstChild);
+                        }
+                        
+                        // 给任务条添加滤镜效果
+                        barElement.setAttribute('filter', 'url(#highlight-shadow-filter)');
+                        
+                        // 将任务条移到最前面
+                        if (barGroup && barElement) {
+                            barGroup.appendChild(barElement);
+                        }
+                        
+                        // 将文本标签也移到最前面，确保可见
+                        const barLabel = wrapper.querySelector('.bar-label');
+                        if (barGroup && barLabel) {
+                            barGroup.appendChild(barLabel);
+                        }
+                    }
+                    break;
+                }
             }
         }
+    }
+    
+    // 创建阴影滤镜
+    createShadowFilter() {
+        // 检查滤镜是否已存在
+        if (document.getElementById('highlight-shadow-filter')) {
+            return;
+        }
+        
+        // 获取SVG元素
+        const svg = document.querySelector('.gantt svg');
+        if (!svg) {
+            return;
+        }
+        
+        // 创建滤镜定义
+        const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+        const filter = document.createElementNS('http://www.w3.org/2000/svg', 'filter');
+        filter.setAttribute('id', 'highlight-shadow-filter');
+        filter.setAttribute('x', '-20%');
+        filter.setAttribute('y', '-20%');
+        filter.setAttribute('width', '140%');
+        filter.setAttribute('height', '140%');
+        
+        // 创建阴影效果
+        const dropShadow = document.createElementNS('http://www.w3.org/2000/svg', 'feDropShadow');
+        dropShadow.setAttribute('dx', '2');
+        dropShadow.setAttribute('dy', '2');
+        dropShadow.setAttribute('stdDeviation', '3');
+        dropShadow.setAttribute('flood-color', 'rgba(0, 0, 0, 0.4)');
+        
+        filter.appendChild(dropShadow);
+        defs.appendChild(filter);
+        svg.appendChild(defs);
+    }
+    
+    // 计算颜色的反色
+    getInverseColor(color) {
+        // 处理十六进制颜色
+        if (color.startsWith('#')) {
+            // 移除#号
+            color = color.slice(1);
+            // 处理缩写形式
+            if (color.length === 3) {
+                color = color.split('').map(char => char + char).join('');
+            }
+            // 转换为RGB
+            const r = parseInt(color.slice(0, 2), 16);
+            const g = parseInt(color.slice(2, 4), 16);
+            const b = parseInt(color.slice(4, 6), 16);
+            // 计算反色
+            const inverseR = 255 - r;
+            const inverseG = 255 - g;
+            const inverseB = 255 - b;
+            // 转换回十六进制
+            return `#${((1 << 24) + (inverseR << 16) + (inverseG << 8) + inverseB).toString(16).slice(1)}`;
+        }
+        // 默认反色
+        return '#ffffff';
+    }
+    
+    // 根据背景色计算对比文本颜色
+    getContrastTextColor(backgroundColor) {
+        // 处理十六进制颜色
+        if (backgroundColor.startsWith('#')) {
+            // 移除#号
+            const color = backgroundColor.slice(1);
+            // 处理缩写形式
+            const hex = color.length === 3 ? color.split('').map(char => char + char).join('') : color;
+            // 转换为RGB
+            const r = parseInt(hex.slice(0, 2), 16);
+            const g = parseInt(hex.slice(2, 4), 16);
+            const b = parseInt(hex.slice(4, 6), 16);
+            // 计算亮度
+            const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+            // 根据亮度返回黑色或白色
+            return brightness > 128 ? '#000000' : '#ffffff';
+        }
+        // 默认文本颜色
+        return '#000000';
     }
     
     init(tasks = []) {
@@ -60,7 +194,8 @@ class GanttManager {
             custom_popup_html: null,
             on_date_change: (task, start, end) => this.onDateChange(task, start, end),
             on_progress_change: (task, progress) => this.onProgressChange(task, progress),
-            on_view_change: (mode) => this.onViewChange(mode)
+            on_view_change: (mode) => this.onViewChange(mode),
+            on_click: (task) => this.onTaskClick(task)
         });
         
         // 保存到全局变量
@@ -156,6 +291,39 @@ class GanttManager {
                 btn.classList.remove('active');
             }
         });
+    }
+    
+    // 任务点击回调
+    onTaskClick(task) {
+        console.log('任务被点击:', task.id);
+        const taskId = parseInt(task.id);
+        
+        // 同步选中左侧边栏的对应任务
+        if (window.taskTreeManager) {
+            window.taskTreeManager.selectTask(taskId);
+        }
+        
+        // 更新当前选中的任务ID
+        this.selectedTaskId = taskId;
+        
+        // 应用高亮效果
+        this.highlightTask(taskId);
+
+        if (window.ganttApp) {
+                window.ganttApp.editTask(taskId);
+            }
+        
+        /*// 双击检测
+        if (!this.lastClickTime || (Date.now() - this.lastClickTime) > 300) {
+            // 单击，只选中任务
+            this.lastClickTime = Date.now();
+        } else {
+            // 双击，打开编辑侧边栏
+            if (window.ganttApp) {
+                window.ganttApp.editTask(taskId);
+            }
+            this.lastClickTime = 0;
+        }*/
     }
     
     // 改变视图模式

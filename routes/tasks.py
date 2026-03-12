@@ -33,6 +33,13 @@ def get_project_tasks(project_id):
     # Return flat list of tasks with dependencies
     return jsonify([task.to_dict() for task in tasks])
 
+# Get all tasks from all projects
+@tasks_bp.route('/all', methods=['GET'])
+def get_all_tasks():
+    tasks = Task.query.all()
+    # Return flat list of tasks with dependencies
+    return jsonify([task.to_dict() for task in tasks])
+
 # Get a single task
 @tasks_bp.route('/<int:task_id>', methods=['GET'])
 def get_task(task_id):
