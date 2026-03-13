@@ -23,6 +23,7 @@ class GanttApp {
         // 项目选择相关
         this.projectSelect = document.getElementById('project-select');
         this.newProjectBtn = document.getElementById('new-project-btn');
+        this.editProjectBtn = document.getElementById('edit-project-btn');
         
         // 任务树相关
         this.taskTree = document.getElementById('task-tree');
@@ -80,12 +81,21 @@ class GanttApp {
         this.closePersonSidebarBtn = document.getElementById('close-person-sidebar');
         this.personList = document.getElementById('person-list');
         this.persons = [];
+        
+        // 项目编辑相关
+        this.editProjectModal = document.getElementById('edit-project-modal');
+        this.editProjectNameInput = document.getElementById('edit-project-name');
+        this.editProjectColorInput = document.getElementById('edit-project-color');
+        this.editProjectDescriptionInput = document.getElementById('edit-project-description');
+        this.saveProjectBtn = document.getElementById('save-project-btn');
+        this.deleteProjectBtn = document.getElementById('delete-project-btn');
     }
     
     bindEvents() {
         // 项目选择
         this.projectSelect.addEventListener('change', (e) => this.onProjectSelect(e));
         this.newProjectBtn.addEventListener('click', () => this.createNewProject());
+        this.editProjectBtn.addEventListener('click', () => this.openEditProjectModal());
         
         // 任务操作
         this.addTaskBtn.addEventListener('click', () => this.addNewTask());
@@ -126,6 +136,10 @@ class GanttApp {
         });
         this.personManagementBtn.addEventListener('click', () => this.openPersonManagementSidebar());
         this.closePersonSidebarBtn.addEventListener('click', () => this.closePersonManagementSidebar());
+        
+        // 项目编辑
+        this.saveProjectBtn.addEventListener('click', () => this.saveProject());
+        this.deleteProjectBtn.addEventListener('click', () => this.deleteProject());
     }
     
     // API 调用辅助函数
@@ -260,6 +274,86 @@ class GanttApp {
             alert('项目创建成功！');
         } catch (error) {
             console.error('创建项目失败:', error);
+        }
+    }
+    
+    openEditProjectModal() {
+        if (!this.currentProjectId || this.currentProjectId === 'all') {
+            alert('请先选择一个项目');
+            return;
+        }
+        
+        const project = this.projects.find(p => p.id === this.currentProjectId);
+        if (!project) {
+            alert('未找到该项目信息');
+            return;
+        }
+        
+        this.editProjectNameInput.value = project.name;
+        this.editProjectColorInput.value = project.color || '#3498db';
+        this.editProjectDescriptionInput.value = project.description || '';
+        this.editProjectModal.classList.add('open');
+    }
+    
+    async saveProject() {
+        if (!this.currentProjectId || this.currentProjectId === 'all') {
+            alert('请先选择一个项目');
+            return;
+        }
+        
+        const name = this.editProjectNameInput.value.trim();
+        const color = this.editProjectColorInput.value;
+        const description = this.editProjectDescriptionInput.value.trim();
+        
+        if (!name) {
+            alert('请输入项目名称');
+            return;
+        }
+        
+        try {
+            await this.apiRequest(`/api/projects/${this.currentProjectId}`, 'PUT', {
+                name,
+                color,
+                description
+            });
+            
+            alert('项目更新成功！');
+            
+            await this.loadProjects();
+            this.closeModal();
+        } catch (error) {
+            console.error('更新项目失败:', error);
+        }
+    }
+    
+    async deleteProject() {
+        if (!this.currentProjectId || this.currentProjectId === 'all') {
+            alert('请先选择一个项目');
+            return;
+        }
+        
+        const project = this.projects.find(p => p.id === this.currentProjectId);
+        if (!project) {
+            alert('未找到该项目信息');
+            return;
+        }
+        
+        if (!confirm(`确定要删除项目"${project.name}"吗？此操作将删除该项目下的所有任务，且无法撤销！`)) {
+            return;
+        }
+        
+        try {
+            await this.apiRequest(`/api/projects/${this.currentProjectId}`, 'DELETE');
+            
+            alert('项目删除成功！');
+            
+            this.currentProjectId = null;
+            this.projectSelect.value = '';
+            
+            await this.loadProjects();
+            this.closeModal();
+        } catch (error) {
+            console.error('删除项目失败:', error);
         }
     }
     
@@ -621,6 +715,7 @@ class GanttApp {
     
     closeModal() {
         this.addPersonModal.classList.remove('open');
+        this.editProjectModal.classList.remove('open');
     }
     
     async savePerson() {
