@@ -21,7 +21,6 @@
             <div class="header-left">
                 <div class="logo-container">
                     <img src="{{ url_for('static', filename='image/logo.png') }}" alt="网站Logo" class="app-logo">
-                    <h1 class="app-title">项目管理工具</h1>
                 </div>
                 <div class="project-selector">
                     <select id="project-select" class="project-dropdown">
@@ -124,7 +123,17 @@
                     
                     <div class="form-group">
                         <label for="task-assignee">负责人</label>
-                        <input type="text" id="task-assignee" class="form-control">
+                        <div class="assignee-selector">
+                            <select id="task-assignee" class="form-control">
+                                <option value="">请选择负责人...</option>
+                            </select>
+                            <button type="button" id="edit-person-btn" class="btn btn-sm btn-secondary" title="编辑负责人">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button type="button" id="add-person-btn" class="btn btn-sm btn-secondary" title="新增人员">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
                     </div>
                     
                     <div class="form-row">
@@ -147,11 +156,6 @@
                         <label for="task-progress">进度 (%)</label>
                         <input type="range" id="task-progress" class="form-control-range" min="0" max="100" step="5">
                         <span id="progress-value">0%</span>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="task-color">颜色</label>
-                        <input type="color" id="task-color" class="form-control" value="#3498db" title="选择任务颜色">
                     </div>
                     
                     <div class="form-group">
@@ -194,6 +198,51 @@
                 <p>加载中...</p>
             </div>
         </div>
+
+        <!-- 新增人员弹窗 -->
+        <div class="modal" id="add-person-modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>新增负责人</h3>
+                    <button class="btn btn-icon modal-close">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="new-person-name">姓名</label>
+                        <input type="text" id="new-person-name" class="form-control" placeholder="请输入负责人姓名" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="new-person-color">颜色</label>
+                        <input type="color" id="new-person-color" class="form-control-color" value="#3498db" title="选择负责人颜色">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" id="save-person-btn" class="btn btn-primary">保存</button>
+                    <button type="button" class="btn btn-secondary modal-close">取消</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 负责人管理面板 -->
+        <aside class="person-management-sidebar" id="person-management-sidebar">
+            <div class="sidebar-header">
+                <h3>负责人管理</h3>
+                <button class="btn btn-icon close-sidebar" id="close-person-sidebar">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="sidebar-content">
+                <div class="person-list" id="person-list">
+                </div>
+            </div>
+        </aside>
+
+        <!-- 负责人管理按钮 -->
+        <button class="person-management-btn" id="person-management-btn" title="负责人管理">
+            <i class="fas fa-users"></i>
+        </button>
     </div>
 
     <!-- JavaScript 文件 -->

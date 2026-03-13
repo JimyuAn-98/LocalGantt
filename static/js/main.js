@@ -9,6 +9,7 @@ class GanttApp {
         this.selectedTaskId = null;
         this.dependencyMode = false;
         this.dependencySourceTaskId = null;
+        this.currentEditingPersonId = null;
 
         // ganttManager will be assigned after DOM is ready; see bottom of file
         this.ganttManager = null;
@@ -49,7 +50,6 @@ class GanttApp {
         this.taskNameInput = document.getElementById('task-name');
         this.taskDescriptionInput = document.getElementById('task-description');
         this.taskAssigneeInput = document.getElementById('task-assignee');
-        this.taskColorInput = document.getElementById('task-color');
         this.taskStartDateInput = document.getElementById('task-start-date');
         this.taskEndDateInput = document.getElementById('task-end-date');
         this.taskDurationInput = document.getElementById('task-duration');
@@ -66,6 +66,20 @@ class GanttApp {
         
         // 加载遮罩
         this.loadingOverlay = document.getElementById('loading-overlay');
+        
+        // 负责人管理相关
+        this.addPersonBtn = document.getElementById('add-person-btn');
+        this.editPersonBtn = document.getElementById('edit-person-btn');
+        this.addPersonModal = document.getElementById('add-person-modal');
+        this.savePersonBtn = document.getElementById('save-person-btn');
+        this.newPersonNameInput = document.getElementById('new-person-name');
+        this.newPersonColorInput = document.getElementById('new-person-color');
+        this.modalCloseBtns = document.querySelectorAll('.modal-close');
+        this.personManagementBtn = document.getElementById('person-management-btn');
+        this.personManagementSidebar = document.getElementById('person-management-sidebar');
+        this.closePersonSidebarBtn = document.getElementById('close-person-sidebar');
+        this.personList = document.getElementById('person-list');
+        this.persons = [];
     }
     
     bindEvents() {
@@ -102,6 +116,16 @@ class GanttApp {
         
         // 依赖关系创建
         this.cancelDependencyBtn.addEventListener('click', () => this.cancelDependencyMode());
+        
+        // 负责人管理
+        this.addPersonBtn.addEventListener('click', () => this.openAddPersonModal());
+        this.editPersonBtn.addEventListener('click', () => this.openEditPersonModal());
+        this.savePersonBtn.addEventListener('click', () => this.savePerson());
+        this.modalCloseBtns.forEach(btn => {
+            btn.addEventListener('click', () => this.closeModal());
+        });
+        this.personManagementBtn.addEventListener('click', () => this.openPersonManagementSidebar());
+        this.closePersonSidebarBtn.addEventListener('click', () => this.closePersonManagementSidebar());
     }
     
     // API 调用辅助函数
@@ -146,6 +170,9 @@ class GanttApp {
             const projects = await this.apiRequest('/api/projects/');
             this.projects = projects;
             this.updateProjectDropdown();
+            
+            // 加载负责人列表
+            await this.loadPersons();
             
             // 如果有项目，默认选择第一个
             if (projects.length > 0 && !this.currentProjectId) {
@@ -388,7 +415,6 @@ class GanttApp {
         this.taskNameInput.value = '';
         this.taskDescriptionInput.value = '';
         this.taskAssigneeInput.value = '';
-        this.taskColorInput.value = '#3498db';
         
         // 默认日期：明天开始，持续3天
         const tomorrow = new Date();
@@ -419,7 +445,6 @@ class GanttApp {
         this.taskNameInput.value = task.name;
         this.taskDescriptionInput.value = task.description || '';
         this.taskAssigneeInput.value = task.assignee || '';
-        this.taskColorInput.value = task.color || '#3498db';
         this.taskStartDateInput.value = task.start_date;
         this.taskEndDateInput.value = task.end_date;
         this.taskDurationInput.value = task.duration;
@@ -441,12 +466,21 @@ class GanttApp {
         }
         
         const taskId = this.taskIdInput.value;
+        const assignee = this.taskAssigneeInput.value;
+        
+        // 根据负责人获取颜色
+        let taskColor = '#3498db';
+        if (assignee) {
+            const selectedOption = this.taskAssigneeInput.options[this.taskAssigneeInput.selectedIndex];
+            taskColor = selectedOption.dataset.color || '#3498db';
+        }
+        
         const taskData = {
             project_id: this.currentProjectId,
             name: this.taskNameInput.value,
             description: this.taskDescriptionInput.value,
-            assignee: this.taskAssigneeInput.value,
-            color: this.taskColorInput.value,
+            assignee: assignee,
+            color: taskColor,
             start_date: this.taskStartDateInput.value,
             end_date: this.taskEndDateInput.value,
             duration: parseInt(this.taskDurationInput.value),
@@ -535,12 +569,274 @@ class GanttApp {
         this.editSidebar.classList.remove('open');
     }
     
+    // ==================== 负责人管理相关方法 ====================
+    async loadPersons() {
+        try {
+            this.persons = await this.apiRequest('/api/persons/');
+            this.updatePersonSelect();
+        } catch (error) {
+            console.error('加载负责人失败:', error);
+        }
+    }
+    
+    updatePersonSelect() {
+        this.taskAssigneeInput.innerHTML = '<option value="">请选择负责人...</option>';
+        this.persons.forEach(person => {
+            const option = document.createElement('option');
+            option.value = person.name;
+            option.textContent = person.name;
+            option.dataset.color = person.color;
+            this.taskAssigneeInput.appendChild(option);
+        });
+    }
+    
+    openAddPersonModal() {
+        this.newPersonNameInput.value = '';
+        this.newPersonColorInput.value = '#3498db';
+        document.querySelector('#add-person-modal .modal-header h3').textContent = '新增负责人';
+        this.addPersonModal.classList.add('open');
+    }
+    
+    openEditPersonModal() {
+        const selectedName = this.taskAssigneeInput.value;
+        if (!selectedName) {
+            alert('请先选择一个负责人');
+            return;
+        }
+        
+        const person = this.persons.find(p => p.name === selectedName);
+        if (!person) {
+            alert('未找到该负责人信息');
+            return;
+        }
+        
+        this.newPersonNameInput.value = person.name;
+        this.newPersonColorInput.value = person.color;
+        document.querySelector('#add-person-modal .modal-header h3').textContent = '编辑负责人';
+        this.addPersonModal.classList.add('open');
+        
+        // 存储当前编辑的负责人ID
+        this.currentEditingPersonId = person.id;
+    }
+    
+    closeModal() {
+        this.addPersonModal.classList.remove('open');
+    }
+    
+    async savePerson() {
+        const name = this.newPersonNameInput.value.trim();
+        const color = this.newPersonColorInput.value;
+        
+        if (!name) {
+            alert('请输入负责人姓名');
+            return;
+        }
+        
+        try {
+            if (this.currentEditingPersonId) {
+                // 更新现有负责人
+                await this.apiRequest(`/api/persons/${this.currentEditingPersonId}`, 'PUT', { name, color });
+                
+                // 查找该负责人的原始姓名
+                const originalPerson = this.persons.find(p => p.id === this.currentEditingPersonId);
+                const originalName = originalPerson ? originalPerson.name : name;
+                
+                // 更新该负责人的所有任务颜色
+                await this.apiRequest('/api/tasks/update-by-assignee', 'PUT', {
+                    assignee: originalName,
+                    color: color
+                });
+                
+                alert('负责人更新成功！');
+            } else {
+                // 创建新负责人
+                await this.apiRequest('/api/persons/', 'POST', { name, color });
+                alert('负责人添加成功！');
+            }
+            
+            // 重新加载任务列表以更新甘特图颜色
+            if (this.currentProjectId === 'all') {
+                await this.loadAllTasks();
+            } else if (this.currentProjectId) {
+                await this.loadProjectTasks();
+            }
+            
+            await this.loadPersons();
+            this.closeModal();
+            
+            // 重置编辑状态
+            this.currentEditingPersonId = null;
+        } catch (error) {
+            console.error('保存负责人失败:', error);
+        }
+    }
+    
+    openPersonManagementSidebar() {
+        this.renderPersonList();
+        this.personManagementSidebar.classList.add('open');
+    }
+    
+    closePersonManagementSidebar() {
+        this.personManagementSidebar.classList.remove('open');
+    }
+    
+    renderPersonList() {
+        this.personList.innerHTML = '';
+        this.persons.forEach(person => {
+            const personItem = document.createElement('div');
+            personItem.className = 'person-item';
+            personItem.innerHTML = `
+                <div class="person-color-indicator" style="background-color: ${person.color}"></div>
+                <div class="person-info">
+                    <div class="person-name-edit">
+                        <input type="text" id="person-name-${person.id}" name="person-name-${person.id}" class="person-name-input" value="${person.name}" data-person-id="${person.id}" placeholder="输入姓名">
+                        <button class="btn btn-sm btn-primary person-save-btn" data-person-id="${person.id}" title="保存">
+                            <i class="fas fa-check"></i>
+                        </button>
+                    </div>
+                    <input type="color" id="person-color-${person.id}" name="person-color-${person.id}" class="person-color-picker" value="${person.color}" data-person-id="${person.id}">
+                </div>
+                <button class="btn person-delete-btn" data-person-id="${person.id}">删除</button>
+            `;
+            
+            const nameInput = personItem.querySelector('.person-name-input');
+            const saveBtn = personItem.querySelector('.person-save-btn');
+            
+            // 保存姓名修改
+            saveBtn.addEventListener('click', () => {
+                const newName = nameInput.value.trim();
+                if (newName) {
+                    this.updatePersonName(person.id, newName);
+                }
+            });
+            
+            // 按Enter键保存
+            nameInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    const newName = nameInput.value.trim();
+                    if (newName) {
+                        this.updatePersonName(person.id, newName);
+                    }
+                }
+            });
+            
+            const colorPicker = personItem.querySelector('.person-color-picker');
+            colorPicker.addEventListener('change', (e) => this.updatePersonColor(person.id, e.target.value));
+            
+            const deleteBtn = personItem.querySelector('.person-delete-btn');
+            deleteBtn.addEventListener('click', () => this.deletePerson(person.id));
+            
+            this.personList.appendChild(personItem);
+        });
+    }
+    
+    async updatePersonName(personId, newName) {
+        try {
+            // 查找该负责人的原始姓名
+            const originalPerson = this.persons.find(p => p.id === personId);
+            const originalName = originalPerson ? originalPerson.name : newName;
+            
+            await this.apiRequest(`/api/persons/${personId}`, 'PUT', { name: newName });
+            
+            // 更新该负责人的所有任务姓名
+            await this.apiRequest('/api/tasks/update-by-assignee', 'PUT', {
+                assignee: originalName,
+                new_name: newName
+            });
+            
+            // 重新加载任务列表以更新甘特图
+            if (this.currentProjectId === 'all') {
+                await this.loadAllTasks();
+            } else if (this.currentProjectId) {
+                await this.loadProjectTasks();
+            }
+            
+            // 更新本地数据
+            const person = this.persons.find(p => p.id === personId);
+            if (person) {
+                person.name = newName;
+            }
+            
+            // 更新下拉选项
+            this.updatePersonSelect();
+            
+        } catch (error) {
+            console.error('更新负责人姓名失败:', error);
+        }
+    }
+    
+    async updatePersonColor(personId, newColor) {
+        try {
+            await this.apiRequest(`/api/persons/${personId}`, 'PUT', { color: newColor });
+            
+            // 更新本地数据
+            const person = this.persons.find(p => p.id === personId);
+            if (person) {
+                person.color = newColor;
+            }
+            
+            // 更新任务颜色
+            const personName = this.persons.find(p => p.id === personId)?.name;
+            if (personName) {
+                await this.apiRequest('/api/tasks/update-by-assignee', 'PUT', {
+                    assignee: personName,
+                    color: newColor
+                });
+            }
+            
+            // 重新加载任务列表以更新甘特图颜色
+            if (this.currentProjectId === 'all') {
+                await this.loadAllTasks();
+            } else if (this.currentProjectId) {
+                await this.loadProjectTasks();
+            }
+            
+            // 更新下拉选项中的颜色数据
+            this.updatePersonSelect();
+            
+        } catch (error) {
+            console.error('更新负责人颜色失败:', error);
+        }
+    }
+    
+    async deletePerson(personId) {
+        if (!confirm('确定要删除该负责人吗？')) {
+            return;
+        }
+        
+        try {
+            await this.apiRequest(`/api/persons/${personId}`, 'DELETE');
+            await this.loadPersons();
+            this.renderPersonList();
+        } catch (error) {
+            console.error('删除负责人失败:', error);
+        }
+    }
+    // ==================== 负责人管理相关方法结束 ====================
+    
     // 任务树相关方法（将由 tree.js 实现）
     updateTaskTree(tasks) {
         // 这个方法将在 tree.js 中实现
         if (window.taskTreeManager) {
             window.taskTreeManager.update(tasks);
         }
+    }
+    
+    // 判断颜色深浅的方法
+    isDarkColor(hexColor) {
+        // 移除 # 号
+        hexColor = hexColor.replace('#', '');
+        
+        // 转换为 RGB
+        const r = parseInt(hexColor.substring(0, 2), 16);
+        const g = parseInt(hexColor.substring(2, 4), 16);
+        const b = parseInt(hexColor.substring(4, 6), 16);
+        
+        // 计算亮度 (HSP 公式)
+        const hsp = Math.sqrt(0.299 * (r * r) + 0.587 * (g * g) + 0.114 * (b * b));
+        
+        // 阈值设为 127.5
+        return hsp < 127.5;
     }
     
     // 甘特图相关方法
@@ -573,8 +869,9 @@ class GanttApp {
                 color = task.color || '#3498db';
             }
             const cls = `task-color-${task.id}`;
+            const textColor = this.isDarkColor(color) ? '#fff' : '#000';
             css += `.${cls} .bar { fill: ${color}; }\n`;
-            css += `.${cls} .bar-label { fill: #fff; }\n`;
+            css += `.${cls} .bar-label { fill: ${textColor}; }\n`;
         });
         style.innerHTML = css;
     }    

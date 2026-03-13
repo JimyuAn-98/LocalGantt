@@ -90,3 +90,18 @@ class Dependency(db.Model):
     type = db.Column(db.String(20), default='FS')  # FS: Finish-to-Start
     
     __table_args__ = (db.UniqueConstraint('predecessor_id', 'successor_id', name='unique_dependency'),)
+
+class Person(db.Model):
+    __tablename__ = 'persons'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False, unique=True)
+    color = db.Column(db.String(7), default='#3498db')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'color': self.color or '#3498db',
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }

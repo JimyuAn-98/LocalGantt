@@ -245,3 +245,23 @@ def get_critical_path(project_id):
         'earliest_start': {tid: es[tid] for tid in task_map},
         'latest_start': {tid: ls[tid] for tid in task_map}
     })
+
+@tasks_bp.route('/update-by-assignee', methods=['PUT'])
+def update_tasks_by_assignee():
+    data = request.get_json()
+    assignee = data.get('assignee')
+    color = data.get('color')
+    new_name = data.get('new_name')
+    
+    if not assignee:
+        return jsonify({'error': 'Missing required field: assignee'}), 400
+    
+    tasks = Task.query.filter_by(assignee=assignee).all()
+    for task in tasks:
+        if color:
+            task.color = color
+        if new_name:
+            task.assignee = new_name
+    
+    db.session.commit()
+    return jsonify({'message': f'Updated {len(tasks)} tasks', 'updated_count': len(tasks)})
