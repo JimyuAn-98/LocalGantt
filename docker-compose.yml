@@ -1,0 +1,17 @@
+version: "3.9"
+
+services:
+  gantt:
+    build: .                    # build using the Dockerfile above
+    image: gantt:latest         # optional tag
+    container_name: gantt_app
+    ports:
+      - "1258:1258"            # map to host
+    volumes:
+      - .:/app                  # bind‑mount source (dev convenience)
+    environment:
+      - FLASK_ENV=development
+      - FLASK_APP=app.py
+      - FLASK_RUN_HOST=0.0.0.0
+      - FLASK_RUN_PORT=1258
+    command: python app.py      # entrypoint to start the server

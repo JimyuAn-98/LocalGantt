@@ -1,3 +1,5 @@
+import os
+
 from flask import Flask, render_template
 from flask_cors import CORS
 from config import Config
@@ -12,6 +14,9 @@ def create_app():
     
     # Initialize database
     db.init_app(app)
+
+    if not os.path.exists('.\\data'):
+        os.makedirs('.\\data')
     
     # Create tables if they don't exist
     with app.app_context():

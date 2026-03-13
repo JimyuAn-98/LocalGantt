@@ -9,7 +9,7 @@ import os
 
 def migrate_database():
     # 数据库文件路径
-    db_path = os.path.join(os.path.dirname(__file__), 'e:\\HJY\\LocalGantt\\data\\gantt.db')
+    db_path = os.path.join(os.path.dirname(__file__), '.\\data\\gantt.db')
     
     if not os.path.exists(db_path):
         print(f"数据库文件不存在: {db_path}")
