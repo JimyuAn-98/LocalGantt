@@ -278,24 +278,10 @@ body {
     flex-direction: column;
     overflow: hidden;
 }
-.gantt-container {
+#gantt-chart {
     flex: 1;
-    overflow: auto;
-    padding: 20px;
+    min-height: 400px;
     position: relative;
-}
-#gantt-chart { min-height: 400px; min-width: 100%; position: relative; }
-
-/* 今日红线 */
-.today-line {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    width: 2px;
-    background-color: var(--color-today-line);
-    z-index: 5;
-    pointer-events: none;
-    opacity: 0.7;
 }
 
 /* 周末列背景 */

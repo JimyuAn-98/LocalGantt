@@ -84,7 +84,6 @@ class GanttManager {
         this._applySelectionCSS();
         setTimeout(() => {
             this.applyWeekendHighlight();
-            this.updateTodayLine();
             this.renderMilestones(tasks);
         }, 200);
     }
@@ -103,59 +102,55 @@ class GanttManager {
         ganttInternal.render();
     }
 
-    // ── 计算今天在甘特图中的像素偏移 ──────────────
-    _getTodayPixelOffset() {
-        const today = new Date(); today.setHours(0, 0, 0, 0);
-        const ganttStart = this.gantt && this.gantt.gantt_start;
-        if (!ganttStart || today < ganttStart) return -1;
-        const step = this.gantt.options.step;
-        const colW = this.gantt.options.column_width;
-        const hoursDiff = (today - ganttStart) / (1000 * 60 * 60);
-        return Math.max(0, (hoursDiff / step) * colW + 260);
-    }
-
-    // ── 今日红线 ──────────────────────────────────
-    updateTodayLine() {
-        const todayLine = document.getElementById('today-line');
-        if (!todayLine) return;
-
-        const px = this._getTodayPixelOffset();
-        if (px < 0) { todayLine.style.display = 'none'; return; }
-
-        // 确保 today-line 在 scrollable 容器 (#gantt-chart) 内部
-        const chart = document.getElementById('gantt-chart');
-        if (chart && todayLine.parentElement !== chart) {
-            chart.appendChild(todayLine);
-        }
-
-        todayLine.style.display = 'block';
-        todayLine.style.left = px + 'px';
-        todayLine.style.top = '50px';
-        todayLine.style.bottom = '0';
-        todayLine.style.height = 'auto';
-    }
-
     // ── 滚动到今天 ─────────────────────────────────
     scrollToToday() {
-        const chart = document.getElementById('gantt-chart');
-        if (!chart) return;
-        const px = this._getTodayPixelOffset();
-        if (px < 0) return;
-        chart.scrollTo({ left: Math.max(0, px - 300), behavior: 'smooth' });
+        // Frappe Gantt creates its own .gantt-container inside #gantt-chart
+        const container = document.querySelector('#gantt-chart .gantt-container');
+        const todayHighlight = document.querySelector('.gantt .today-highlight');
+        if (!container || !todayHighlight) return;
+        const cr = container.getBoundingClientRect();
+        const hr = todayHighlight.getBoundingClientRect();
+        const target = container.scrollLeft + hr.left - cr.left - cr.width / 3;
+        container.scrollTo({ left: Math.max(0, target), behavior: 'smooth' });
     }
 
-    // Ctrl+滚轮缩放
+    // Ctrl+滚轮缩放 — 横向调整列宽，Frappe Gantt 内部重新布局
     handleWheelZoom(e) {
         if (!e.ctrlKey) return;
         e.preventDefault();
+        if (!this.gantt) return;
+
+        const step = 5;
+        let newW = e.deltaY < 0
+            ? this.gantt.options.column_width + step
+            : this.gantt.options.column_width - step;
+        newW = Math.max(10, Math.min(120, newW));
+        if (newW === this.gantt.options.column_width) return;
+
+        this.gantt.options.column_width = newW;
+        this.gantt.setup_date_values();
+        this.gantt.render();
+
+        // 清除可能残留的 CSS transform
         const container = document.querySelector('.gantt-container');
-        if (!container) return;
-        // 简单调整 container 的缩放
-        const currentScale = parseFloat(container.style.transform?.match(/scale\(([\d.]+)\)/)?.[1] || '1');
-        let newScale = e.deltaY < 0 ? currentScale * 1.1 : currentScale / 1.1;
-        newScale = Math.max(0.5, Math.min(2, newScale));
-        container.style.transform = `scale(${newScale})`;
-        container.style.transformOrigin = 'top left';
+        if (container) container.style.transform = '';
+
+        // 确保缩放后今天仍在渲染范围内
+        if (this.gantt.gantt_end) {
+            const today = new Date(); today.setHours(23, 59, 59, 999);
+            if (this.gantt.gantt_end < today) {
+                const newEnd = new Date();
+                newEnd.setDate(newEnd.getDate() + 7);
+                this.gantt.gantt_end = newEnd;
+                this.gantt.setup_date_values();
+                this.gantt.render();
+            }
+        }
+
+        setTimeout(() => {
+            this.applyWeekendHighlight();
+            this.renderMilestones(this.tasks);
+        }, 100);
     }
 
     // ── 视图模式 ──────────────────────────────────
@@ -164,7 +159,6 @@ class GanttManager {
         this.viewMode = ganttMode;
         this.gantt.change_view_mode(ganttMode);
         this._extendGanttToToday();
-        setTimeout(() => this.updateTodayLine(), 200);
     }
 
     onViewChange(mode) {
@@ -174,7 +168,6 @@ class GanttManager {
             const match = (v === 'day' && mode === 'Day') || (v === 'week' && mode === 'Week') || (v === 'month' && mode === 'Month');
             btn.classList.toggle('active', match);
         });
-        setTimeout(() => this.updateTodayLine(), 200);
     }
 
     // ── 任务点击 ──────────────────────────────────

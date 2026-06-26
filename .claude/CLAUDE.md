@@ -89,19 +89,6 @@ npx @anthropic-ai/mcp-inspector C:\Users\1\.conda\envs\gantt\python.exe mcp_serv
 - 数据存储在 `data/gantt.db`（SQLite 单文件），启动时自动创建目录和文件
 - 端口默认 1258
 - `html2canvas` 从 CDN 加载（导出图片功能），其余前端库已本地化
-
-## 已知难题
-
-### "今天"按钮滚动跳转无效
-
-**当前状态**：
-- ✅ 日视图日期渲染范围已修复 — `_extendGanttToToday()` 扩展 `gantt_end` 到 today+7d，甘特图能渲染到6月的列
-- ✅ 今日红线 `updateTodayLine()` 位置正确（日视图）
-- ❌ `scrollToToday()` 调用 `#gantt-chart.scrollTo()` 不生效，点击「今天」按钮无法跳转
-
-**已确认无效**：`#gantt-chart.scrollTo({ left: px, behavior: 'smooth' })` 不执行滚动，可能 Frappe Gantt 内部有独立的滚动管理或事件拦截。
-
-**涉及文件**：
-- `static/js/gantt.js` — `scrollToToday()`、`_getTodayPixelOffset()`、`updateTodayLine()`、`_extendGanttToToday()`
-- `static/css/style.css` — `#gantt-chart`（已有 `position: relative`）、`.today-line`
-- `static/lib/frappe-gantt.min.js` — 版本 0.6.0，无 `scroll_to_date` / `change_options` API
+- Ctrl+滚轮缩放：调整 Frappe Gantt 内部 `column_width` + 重新渲染，非 CSS transform
+- "今天"按钮滚动：用 FG 自带的 `.today-highlight` rect 定位，滚动 FG 内部的 `.gantt-container`
+- DOM 结构：`#gantt-chart`（flex:1）→ FG 自动创建 `.gantt-container` → SVG。只有一层，无外层包裹
