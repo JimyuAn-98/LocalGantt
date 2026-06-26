@@ -469,10 +469,10 @@ if __name__ == "__main__":
 
     if args.transport == "http":
         print(f"MCP Server starting at: http://{args.host}:{args.port}{args.path}")
-        # Override settings via constructor params — re-create mcp with custom host/port
         mcp.settings.host = args.host
         mcp.settings.port = args.port
         mcp.settings.streamable_http_path = args.path
+        mcp.settings.transport_security.enable_dns_rebinding_protection = False
         mcp.run(transport="streamable-http")
     else:
         mcp.run(transport="stdio")
