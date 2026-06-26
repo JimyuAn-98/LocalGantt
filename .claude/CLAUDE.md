@@ -2,6 +2,8 @@
 
 本文件为 Claude Code (claude.ai/code) 在此仓库中工作提供指导。
 
+部署到新电脑的完整步骤见 `docs/DEPLOY.md`。
+
 ## 运行与开发
 
 **Conda 环境**：`gantt`（Python 3.11.15）
