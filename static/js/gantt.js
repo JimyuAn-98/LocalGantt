@@ -10,6 +10,46 @@ class GanttManager {
         this.selectedTaskId = null;
 
         this.viewMode = 'Week';
+
+        // 右键拖拽平移
+        this._panning = false;
+        this._panX = 0; this._panY = 0;
+        this._panScrollL = 0; this._panScrollT = 0;
+        this.container.addEventListener('mousedown', this._onPanStart.bind(this));
+        document.addEventListener('mousemove', this._onPanMove.bind(this));
+        document.addEventListener('mouseup', this._onPanEnd.bind(this));
+    }
+
+    _getScrollContainer() {
+        return this.container.querySelector('.gantt-container') || this.container;
+    }
+
+    _onPanStart(e) {
+        if (e.button !== 0) return;
+        // 不拦截任务条上的点击（bar-wrapper / bar / handle / label）
+        const target = e.target;
+        if (target.closest('.bar-wrapper, .bar, .handle, .bar-label, .bar-progress')) return;
+        e.preventDefault();
+        this._panning = true;
+        this._panX = e.clientX;
+        this._panY = e.clientY;
+        const sc = this._getScrollContainer();
+        this._panScrollL = sc.scrollLeft;
+        this._panScrollT = sc.scrollTop;
+        this.container.classList.add('grabbing');
+    }
+
+    _onPanMove(e) {
+        if (!this._panning) return;
+        const sc = this._getScrollContainer();
+        sc.scrollLeft = this._panScrollL + (this._panX - e.clientX);
+        sc.scrollTop = this._panScrollT + (this._panY - e.clientY);
+    }
+
+    _onPanEnd() {
+        if (!this._panning) return;
+        this._panning = false;
+        this.container.classList.remove('grabbing');
     }
 
     setSelectedTask(taskId) {
@@ -104,8 +144,7 @@ class GanttManager {
 
     // ── 滚动到今天 ─────────────────────────────────
     scrollToToday() {
-        // Frappe Gantt creates its own .gantt-container inside #gantt-chart
-        const container = document.querySelector('#gantt-chart .gantt-container');
+        const container = this._getScrollContainer();
         const todayHighlight = document.querySelector('.gantt .today-highlight');
         if (!container || !todayHighlight) return;
         const cr = container.getBoundingClientRect();
@@ -132,7 +171,7 @@ class GanttManager {
         this.gantt.render();
 
         // 清除可能残留的 CSS transform
-        const container = document.querySelector('.gantt-container');
+        const container = document.getElementById('gantt-chart');
         if (container) container.style.transform = '';
 
         // 确保缩放后今天仍在渲染范围内

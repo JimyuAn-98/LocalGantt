@@ -282,6 +282,14 @@ body {
     flex: 1;
     min-height: 400px;
     position: relative;
+    overflow: hidden;
+    cursor: grab;
+}
+#gantt-chart .gantt-container {
+    height: 100%;
+}
+#gantt-chart.grabbing {
+    cursor: grabbing;
 }
 
 /* 周末列背景 */
