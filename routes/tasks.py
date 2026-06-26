@@ -56,7 +56,15 @@ def create_task():
     # Parse dates
     start_date = date.fromisoformat(data['start_date']) if 'start_date' in data else date.today()
     end_date = date.fromisoformat(data['end_date']) if 'end_date' in data else start_date
-    
+    is_milestone = data.get('is_milestone', False)
+
+    # milestone: duration forced to 0, end_date = start_date
+    if is_milestone:
+        duration_val = 0
+        end_date = start_date
+    else:
+        duration_val = data.get('duration', (end_date - start_date).days + 1)
+
     task = Task(
         project_id=data['project_id'],
         parent_id=data.get('parent_id'),
@@ -64,9 +72,10 @@ def create_task():
         description=data.get('description', ''),
         assignee=data.get('assignee', ''),
         color=data.get('color', '#3498db'),
+        is_milestone=is_milestone,
         start_date=start_date,
         end_date=end_date,
-        duration=data.get('duration', (end_date - start_date).days + 1),
+        duration=duration_val,
         progress=data.get('progress', 0)
     )
     db.session.add(task)
@@ -101,6 +110,12 @@ def update_task(task_id):
         task.progress = data['progress']
     if 'color' in data:
         task.color = data['color']
+    if 'is_milestone' in data:
+        task.is_milestone = data['is_milestone']
+        if data['is_milestone']:
+            task.duration = 0
+            if 'start_date' in task.__dict__ or task.start_date:
+                task.end_date = task.start_date
     
     db.session.commit()
     

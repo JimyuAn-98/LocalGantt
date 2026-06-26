@@ -31,6 +31,7 @@ class Task(db.Model):
     description = db.Column(db.Text, default='')
     assignee = db.Column(db.String(100), default='')
     color = db.Column(db.String(7), default='#3498db')  # hex color for gantt bar
+    is_milestone = db.Column(db.Boolean, default=False)
     start_date = db.Column(db.Date, nullable=False)
     end_date = db.Column(db.Date, nullable=False)
     duration = db.Column(db.Integer, default=0)  # in days
@@ -56,6 +57,7 @@ class Task(db.Model):
             'end_date': self.end_date.isoformat() if self.end_date else None,
             'duration': self.duration,
             'progress': self.progress,
+            'is_milestone': self.is_milestone,
             'has_children': len(self.children) > 0,
             'dependencies': predecessor_ids,
             'successors': successor_ids

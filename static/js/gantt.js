@@ -8,187 +8,53 @@ class GanttManager {
         this.dependencyMode = false;
         this.dependencySourceTaskId = null;
         this.selectedTaskId = null;
-        this.lastClickTime = 0; // 用于双击检测
-        
-        // defer actual instantiation until we have some tasks or when update is called
-        // so empty projects won't trigger library errors
+
+        this.viewMode = 'Week';
     }
-    
-    // 设置选中的任务
+
     setSelectedTask(taskId) {
         this.selectedTaskId = taskId;
-        this.highlightTask(taskId);
+        this._applySelectionCSS();
     }
-    
-    // 高亮任务
-    highlightTask(taskId) {
-        // 移除之前的高亮效果
-        document.querySelectorAll('.highlight-shadow').forEach(shadow => {
-            shadow.remove();
-        });
-        
-        // 恢复任务条样式
-        document.querySelectorAll('.bar').forEach(bar => {
-            bar.setAttribute('filter', '');
-        });
-        
-        // 确保taskId是字符串格式，与甘特图中的data-id保持一致
-        if (taskId) {
-            const taskIdStr = taskId.toString();
-            // 使用更适合SVG元素的选择方式
-            const ganttBars = document.querySelectorAll('.bar-wrapper');
-            for (let i = 0; i < ganttBars.length; i++) {
-                const wrapper = ganttBars[i];
-                if (wrapper.getAttribute('data-id') === taskIdStr) {
-                    // 获取任务条元素
-                    const barElement = wrapper.querySelector('.bar');
-                    if (barElement) {
-                        // 获取任务条的位置和尺寸
-                        const x = parseFloat(barElement.getAttribute('x'));
-                        const y = parseFloat(barElement.getAttribute('y'));
-                        const width = parseFloat(barElement.getAttribute('width'));
-                        const height = parseFloat(barElement.getAttribute('height'));
-                        const rx = barElement.getAttribute('rx') || '3';
-                        const ry = barElement.getAttribute('ry') || '3';
-                        
-                        // 创建SVG滤镜定义（如果不存在）
-                        this.createShadowFilter();
-                        
-                        // 创建阴影层（在任务条下方）
-                        const shadow = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-                        shadow.setAttribute('class', 'highlight-shadow');
-                        shadow.setAttribute('x', x + 3);
-                        shadow.setAttribute('y', y + 3);
-                        shadow.setAttribute('width', width);
-                        shadow.setAttribute('height', height);
-                        shadow.setAttribute('rx', rx);
-                        shadow.setAttribute('ry', ry);
-                        shadow.setAttribute('fill', 'rgba(0, 0, 0, 0.3)');
-                        shadow.setAttribute('pointer-events', 'none');
-                        
-                        // 将阴影添加到bar-group的最前面
-                        const barGroup = wrapper.querySelector('.bar-group');
-                        if (barGroup) {
-                            barGroup.insertBefore(shadow, barGroup.firstChild);
-                        }
-                        
-                        // 给任务条添加滤镜效果
-                        barElement.setAttribute('filter', 'url(#highlight-shadow-filter)');
-                        
-                        // 将任务条移到最前面
-                        if (barGroup && barElement) {
-                            barGroup.appendChild(barElement);
-                        }
-                        
-                        // 将文本标签也移到最前面，确保可见
-                        const barLabel = wrapper.querySelector('.bar-label');
-                        if (barGroup && barLabel) {
-                            barGroup.appendChild(barLabel);
-                        }
-                    }
-                    break;
+
+    // CSS-based highlight — uses !important to beat Frappe Gantt inline styles
+    _applySelectionCSS() {
+        const styleId = 'gantt-selection-style';
+        let style = document.getElementById(styleId);
+        if (!style) {
+            style = document.createElement('style');
+            style.id = styleId;
+            document.head.appendChild(style);
+        }
+        if (this.selectedTaskId) {
+            style.innerHTML = `
+                .bar-wrapper[data-id="${this.selectedTaskId}"] .bar {
+                    stroke: #1a5276 !important;
+                    stroke-width: 2.5 !important;
+                    filter: drop-shadow(0 0 5px rgba(26,82,118,0.7)) !important;
                 }
-            }
+                .bar-wrapper[data-id="${this.selectedTaskId}"] .bar-label {
+                    font-weight: 700 !important;
+                }
+            `;
+        } else {
+            style.innerHTML = '';
         }
     }
-    
-    // 创建阴影滤镜
-    createShadowFilter() {
-        // 检查滤镜是否已存在
-        if (document.getElementById('highlight-shadow-filter')) {
-            return;
-        }
-        
-        // 获取SVG元素
-        const svg = document.querySelector('.gantt svg');
-        if (!svg) {
-            return;
-        }
-        
-        // 创建滤镜定义
-        const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
-        const filter = document.createElementNS('http://www.w3.org/2000/svg', 'filter');
-        filter.setAttribute('id', 'highlight-shadow-filter');
-        filter.setAttribute('x', '-20%');
-        filter.setAttribute('y', '-20%');
-        filter.setAttribute('width', '140%');
-        filter.setAttribute('height', '140%');
-        
-        // 创建阴影效果
-        const dropShadow = document.createElementNS('http://www.w3.org/2000/svg', 'feDropShadow');
-        dropShadow.setAttribute('dx', '2');
-        dropShadow.setAttribute('dy', '2');
-        dropShadow.setAttribute('stdDeviation', '3');
-        dropShadow.setAttribute('flood-color', 'rgba(0, 0, 0, 0.4)');
-        
-        filter.appendChild(dropShadow);
-        defs.appendChild(filter);
-        svg.appendChild(defs);
-    }
-    
-    // 计算颜色的反色
-    getInverseColor(color) {
-        // 处理十六进制颜色
-        if (color.startsWith('#')) {
-            // 移除#号
-            color = color.slice(1);
-            // 处理缩写形式
-            if (color.length === 3) {
-                color = color.split('').map(char => char + char).join('');
-            }
-            // 转换为RGB
-            const r = parseInt(color.slice(0, 2), 16);
-            const g = parseInt(color.slice(2, 4), 16);
-            const b = parseInt(color.slice(4, 6), 16);
-            // 计算反色
-            const inverseR = 255 - r;
-            const inverseG = 255 - g;
-            const inverseB = 255 - b;
-            // 转换回十六进制
-            return `#${((1 << 24) + (inverseR << 16) + (inverseG << 8) + inverseB).toString(16).slice(1)}`;
-        }
-        // 默认反色
-        return '#ffffff';
-    }
-    
-    // 根据背景色计算对比文本颜色
-    getContrastTextColor(backgroundColor) {
-        // 处理十六进制颜色
-        if (backgroundColor.startsWith('#')) {
-            // 移除#号
-            const color = backgroundColor.slice(1);
-            // 处理缩写形式
-            const hex = color.length === 3 ? color.split('').map(char => char + char).join('') : color;
-            // 转换为RGB
-            const r = parseInt(hex.slice(0, 2), 16);
-            const g = parseInt(hex.slice(2, 4), 16);
-            const b = parseInt(hex.slice(4, 6), 16);
-            // 计算亮度
-            const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-            // 根据亮度返回黑色或白色
-            return brightness > 128 ? '#000000' : '#ffffff';
-        }
-        // 默认文本颜色
-        return '#000000';
-    }
-    
-    init(tasks = []) {
-        // 防止传入空数组导致内部计算出 null 日期的问题
+
+    _createGantt(tasks) {
         const initialTasks = tasks.length ? tasks : [{
-            id: '0',
-            name: '',
+            id: '0', name: '',
             start: new Date().toISOString().split('T')[0],
             end: new Date().toISOString().split('T')[0],
             progress: 0
         }];
-
-        // 初始化甘特图
         this.gantt = new Gantt(this.container, initialTasks, {
             header_height: 50,
             column_width: 30,
             step: 24,
             view_modes: ['Day', 'Week', 'Month'],
-            view_mode: 'Week',
+            view_mode: this.viewMode,
             date_format: 'YYYY-MM-DD',
             language: 'zh',
             custom_popup_html: null,
@@ -197,319 +63,276 @@ class GanttManager {
             on_view_change: (mode) => this.onViewChange(mode),
             on_click: (task) => this.onTaskClick(task)
         });
-        
-        // 保存到全局变量
+    }
+
+    init(tasks = []) {
+        this._createGantt(tasks);
         window.ganttChart = this;
     }
-    
-    // 更新甘特图数据
+
     update(tasks) {
         this.tasks = tasks;
         if (!this.gantt) {
-            // first creation happens when we have task data (could still be empty)
-            this.init(tasks);
+            this._createGantt(tasks);
+            window.ganttChart = this;
+            setTimeout(() => this._extendGanttToToday(), 100);
         } else {
             this.gantt.refresh(tasks.length ? tasks : []);
+            this._extendGanttToToday();
         }
         this.applyCriticalPathHighlight();
-        // 重新应用任务高亮
-        this.highlightTask(this.selectedTaskId);
+        this._applySelectionCSS();
+        setTimeout(() => {
+            this.applyWeekendHighlight();
+            this.updateTodayLine();
+            this.renderMilestones(tasks);
+        }, 200);
     }
-    
-    // 日期变化回调（拖拽任务条）
-    async onDateChange(task, start, end) {
-        console.log('任务日期变化:', task.id, start, end);
-        
-        // 更新任务数据
-        const taskId = parseInt(task.id);
-        const taskData = {
-            start_date: start.toISOString().split('T')[0],
-            end_date: end.toISOString().split('T')[0],
-            duration: Math.max(1, Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1)
-        };
-        
-        try {
-            // 调用API更新任务
-            await fetch(`/api/tasks/${taskId}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(taskData)
-            });
-            
-            // 刷新应用数据
-            if (window.ganttApp && window.ganttApp.currentProjectId) {
-                await window.ganttApp.loadProjectTasks();
-            }
-        } catch (error) {
-            console.error('更新任务日期失败:', error);
-            // 恢复原状
-            this.gantt.refresh(this.tasks);
-        }
-    }
-    
-    // 进度变化回调（拖拽进度条）
-    async onProgressChange(task, progress) {
-        console.log('任务进度变化:', task.id, progress);
-        
-        const taskId = parseInt(task.id);
-        const taskData = {
-            progress: Math.round(progress * 100)
-        };
-        
-        try {
-            await fetch(`/api/tasks/${taskId}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(taskData)
-            });
-            
-            if (window.ganttApp && window.ganttApp.currentProjectId) {
-                await window.ganttApp.loadProjectTasks();
-            }
-        } catch (error) {
-            console.error('更新任务进度失败:', error);
-            this.gantt.refresh(this.tasks);
-        }
-    }
-    
-    // 视图变化回调
-    onViewChange(mode) {
-        console.log('视图模式改变为:', mode);
-        // 更新顶部工具栏的激活状态
-        const buttons = document.querySelectorAll('.view-controls .btn-icon');
-        buttons.forEach(btn => {
-            const view = btn.dataset.view;
-            if ((view === 'day' && mode === 'Day') ||
-                (view === 'week' && mode === 'Week') ||
-                (view === 'month' && mode === 'Month')) {
-                btn.classList.add('active');
-            } else {
-                btn.classList.remove('active');
-            }
-        });
-    }
-    
-    // 任务点击回调
-    onTaskClick(task) {
-        console.log('任务被点击:', task.id);
-        const taskId = parseInt(task.id);
-        
-        // 同步选中左侧边栏的对应任务
-        if (window.taskTreeManager) {
-            window.taskTreeManager.selectTask(taskId);
-        }
-        
-        // 更新当前选中的任务ID
-        this.selectedTaskId = taskId;
-        
-        // 应用高亮效果
-        this.highlightTask(taskId);
 
-        if (window.ganttApp) {
-                window.ganttApp.editTask(taskId);
-            }
-        
-        /*// 双击检测
-        if (!this.lastClickTime || (Date.now() - this.lastClickTime) > 300) {
-            // 单击，只选中任务
-            this.lastClickTime = Date.now();
-        } else {
-            // 双击，打开编辑侧边栏
-            if (window.ganttApp) {
-                window.ganttApp.editTask(taskId);
-            }
-            this.lastClickTime = 0;
-        }*/
+    // 确保甘特图渲染范围覆盖今天（Frappe Gantt 默认只渲染到任务结束日期附近）
+    _extendGanttToToday() {
+        const ganttInternal = this.gantt;
+        if (!ganttInternal.gantt_end) return;
+        const today = new Date();
+        today.setHours(23, 59, 59, 999);
+        if (ganttInternal.gantt_end >= today) return;
+        const newEnd = new Date();
+        newEnd.setDate(newEnd.getDate() + 7);
+        ganttInternal.gantt_end = newEnd;
+        ganttInternal.setup_date_values();
+        ganttInternal.render();
     }
-    
-    // 改变视图模式
-    change_view_mode(mode) {
-        let ganttMode;
-        switch (mode) {
-            case 'day':
-                ganttMode = 'Day';
-                break;
-            case 'week':
-                ganttMode = 'Week';
-                break;
-            case 'month':
-                ganttMode = 'Month';
-                break;
-            default:
-                ganttMode = 'Day';
+
+    // ── 计算今天在甘特图中的像素偏移 ──────────────
+    _getTodayPixelOffset() {
+        const today = new Date(); today.setHours(0, 0, 0, 0);
+        const ganttStart = this.gantt && this.gantt.gantt_start;
+        if (!ganttStart || today < ganttStart) return -1;
+        const step = this.gantt.options.step;
+        const colW = this.gantt.options.column_width;
+        const hoursDiff = (today - ganttStart) / (1000 * 60 * 60);
+        return Math.max(0, (hoursDiff / step) * colW + 260);
+    }
+
+    // ── 今日红线 ──────────────────────────────────
+    updateTodayLine() {
+        const todayLine = document.getElementById('today-line');
+        if (!todayLine) return;
+
+        const px = this._getTodayPixelOffset();
+        if (px < 0) { todayLine.style.display = 'none'; return; }
+
+        // 确保 today-line 在 scrollable 容器 (#gantt-chart) 内部
+        const chart = document.getElementById('gantt-chart');
+        if (chart && todayLine.parentElement !== chart) {
+            chart.appendChild(todayLine);
         }
-        this.gantt.change_view_mode(ganttMode);
+
+        todayLine.style.display = 'block';
+        todayLine.style.left = px + 'px';
+        todayLine.style.top = '50px';
+        todayLine.style.bottom = '0';
+        todayLine.style.height = 'auto';
     }
-    
-    // 高亮关键路径
+
+    // ── 滚动到今天 ─────────────────────────────────
+    scrollToToday() {
+        const chart = document.getElementById('gantt-chart');
+        if (!chart) return;
+        const px = this._getTodayPixelOffset();
+        if (px < 0) return;
+        chart.scrollTo({ left: Math.max(0, px - 300), behavior: 'smooth' });
+    }
+
+    // Ctrl+滚轮缩放
+    handleWheelZoom(e) {
+        if (!e.ctrlKey) return;
+        e.preventDefault();
+        const container = document.querySelector('.gantt-container');
+        if (!container) return;
+        // 简单调整 container 的缩放
+        const currentScale = parseFloat(container.style.transform?.match(/scale\(([\d.]+)\)/)?.[1] || '1');
+        let newScale = e.deltaY < 0 ? currentScale * 1.1 : currentScale / 1.1;
+        newScale = Math.max(0.5, Math.min(2, newScale));
+        container.style.transform = `scale(${newScale})`;
+        container.style.transformOrigin = 'top left';
+    }
+
+    // ── 视图模式 ──────────────────────────────────
+    change_view_mode(mode) {
+        const ganttMode = { day: 'Day', week: 'Week', month: 'Month' }[mode] || 'Day';
+        this.viewMode = ganttMode;
+        this.gantt.change_view_mode(ganttMode);
+        this._extendGanttToToday();
+        setTimeout(() => this.updateTodayLine(), 200);
+    }
+
+    onViewChange(mode) {
+        this.viewMode = mode;
+        document.querySelectorAll('.view-controls .btn-icon').forEach(btn => {
+            const v = btn.dataset.view;
+            const match = (v === 'day' && mode === 'Day') || (v === 'week' && mode === 'Week') || (v === 'month' && mode === 'Month');
+            btn.classList.toggle('active', match);
+        });
+        setTimeout(() => this.updateTodayLine(), 200);
+    }
+
+    // ── 任务点击 ──────────────────────────────────
+    onTaskClick(task) {
+        const taskId = parseInt(task.id);
+        if (window.taskTreeManager) window.taskTreeManager.selectTask(taskId);
+        this.selectedTaskId = taskId;
+        this._applySelectionCSS();
+        if (window.ganttApp) window.ganttApp.editTask(taskId);
+    }
+
+    // ── 关键路径 ──────────────────────────────────
     highlightCriticalPath(taskIds) {
         this.criticalTaskIds = new Set(taskIds);
         this.applyCriticalPathHighlight();
     }
-    
+
     applyCriticalPathHighlight() {
-        // 移除之前的高亮
-        document.querySelectorAll('.bar-critical').forEach(el => {
-            el.classList.remove('bar-critical');
-        });
-        
-        // 添加新的高亮
+        document.querySelectorAll('.bar-critical').forEach(el => el.classList.remove('bar-critical'));
         this.criticalTaskIds.forEach(taskId => {
             const bar = document.querySelector(`.bar-wrapper[data-id="${taskId}"] .bar`);
-            if (bar) {
-                bar.classList.add('bar-critical');
+            if (bar) bar.classList.add('bar-critical');
+        });
+    }
+
+    // ── 周末高亮 ──────────────────────────────────
+    applyWeekendHighlight() {
+        const svg = document.querySelector('.gantt svg');
+        if (!svg) return;
+        svg.querySelectorAll('rect').forEach(rect => {
+            const dateStr = rect.getAttribute('data-date');
+            if (dateStr && [0, 6].includes(new Date(dateStr).getDay())) {
+                rect.setAttribute('fill', 'rgba(0,0,0,0.04)');
             }
         });
     }
-    
-    // 进入依赖关系创建模式
-    enterDependencyMode() {
-        this.dependencyMode = true;
-        this.dependencySourceTaskId = null;
-        
-        // 添加任务条点击监听
-        this.container.addEventListener('click', this.handleDependencyClick.bind(this));
-        
-        // 修改鼠标样式
-        this.container.style.cursor = 'crosshair';
-        
-        console.log('进入依赖关系创建模式');
-    }
-    
-    // 退出依赖关系创建模式
-    exitDependencyMode() {
-        this.dependencyMode = false;
-        this.dependencySourceTaskId = null;
-        
-        // 移除点击监听
-        this.container.removeEventListener('click', this.handleDependencyClick.bind(this));
-        
-        // 恢复鼠标样式
-        this.container.style.cursor = '';
-        
-        console.log('退出依赖关系创建模式');
-    }
-    
-    // 处理依赖关系点击
-    handleDependencyClick(event) {
-        if (!this.dependencyMode) return;
-        
-        // 找到被点击的任务条
-        let target = event.target;
-        while (target && !target.classList.contains('bar-wrapper')) {
-            target = target.parentElement;
-        }
-        
-        if (!target) return;
-        
-        const taskId = parseInt(target.dataset.id);
-        if (!taskId) return;
-        
-        if (this.dependencySourceTaskId === null) {
-            // 选择第一个任务（前置任务）
-            this.dependencySourceTaskId = taskId;
-            this.highlightTaskForDependency(taskId, true);
-            console.log('选择前置任务:', taskId);
-        } else {
-            // 选择第二个任务（后继任务）
-            const predecessorId = this.dependencySourceTaskId;
-            const successorId = taskId;
-            
-            // 检查是否选择相同的任务
-            if (predecessorId === successorId) {
-                alert('不能选择相同的任务作为依赖');
-                this.clearDependencySelection();
-                return;
+
+    // ── 里程碑菱形 ────────────────────────────────
+    renderMilestones(tasks) {
+        document.querySelectorAll('.milestone-marker').forEach(el => el.remove());
+        const milestoneTasks = tasks.filter(t => t.is_milestone);
+        const svg = document.querySelector('.gantt svg');
+        if (!svg || !milestoneTasks.length) return;
+
+        milestoneTasks.forEach(task => {
+            const wrapper = document.querySelector(`.bar-wrapper[data-id="${task.id}"]`);
+            if (!wrapper) return;
+            const bar = wrapper.querySelector('.bar');
+            const barGroup = wrapper.querySelector('.bar-group');
+            if (!bar || !barGroup) return;
+
+            const x = parseFloat(bar.getAttribute('x') || '0');
+            const y = parseFloat(bar.getAttribute('y') || '0');
+            const h = parseFloat(bar.getAttribute('height') || '20');
+            const cx = x + 6, cy = y + h / 2, s = 8;
+
+            const ns = 'http://www.w3.org/2000/svg';
+            const diamond = document.createElementNS(ns, 'polygon');
+            diamond.setAttribute('points', `${cx},${cy - s} ${cx + s},${cy} ${cx},${cy + s} ${cx - s},${cy}`);
+            diamond.setAttribute('class', 'milestone-marker');
+            diamond.setAttribute('fill', task.color || '#f39c12');
+            diamond.setAttribute('stroke', '#333');
+            diamond.setAttribute('stroke-width', '1');
+            barGroup.appendChild(diamond);
+            // 只隐藏传统 bar label，保留菱形
+            const label = wrapper.querySelector('.bar-label');
+            if (label) {
+                label.setAttribute('x', cx + s + 4);
+                label.setAttribute('y', cy + 4);
             }
-            
-            console.log('创建依赖关系:', predecessorId, '->', successorId);
-            this.createDependency(predecessorId, successorId);
-            this.clearDependencySelection();
-        }
-    }
-    
-    // 高亮任务用于依赖选择
-    highlightTaskForDependency(taskId, isSource) {
-        const bar = document.querySelector(`.bar-wrapper[data-id="${taskId}"] .bar`);
-        if (bar) {
-            bar.style.stroke = isSource ? '#3498db' : '#e74c3c';
-            bar.style.strokeWidth = '3px';
-        }
-    }
-    
-    // 清除依赖选择高亮
-    clearDependencySelection() {
-        document.querySelectorAll('.bar').forEach(bar => {
-            bar.style.stroke = '';
-            bar.style.strokeWidth = '';
         });
-        this.dependencySourceTaskId = null;
     }
-    
-    // 创建依赖关系
-    async createDependency(predecessorId, successorId) {
+
+    // ── 拖拽回调 ──────────────────────────────────
+    async onDateChange(task, start, end) {
+        const taskId = parseInt(task.id);
         try {
-            const response = await fetch(`/api/tasks/${successorId}/dependencies`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+            await fetch(`/api/tasks/${taskId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    predecessor_id: predecessorId
+                    start_date: start.toISOString().split('T')[0],
+                    end_date: end.toISOString().split('T')[0],
+                    duration: Math.max(1, Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1)
                 })
             });
-            
-            if (response.ok) {
-                alert('依赖关系创建成功！');
-                
-                // 刷新甘特图
-                if (window.ganttApp && window.ganttApp.currentProjectId) {
-                    await window.ganttApp.loadProjectTasks();
-                }
+            if (window.ganttApp && window.ganttApp.currentProjectId) await window.ganttApp.loadProjectTasks();
+        } catch (e) {
+            console.error('更新日期失败:', e);
+            this.gantt.refresh(this.tasks);
+        }
+    }
+
+    async onProgressChange(task, progress) {
+        const taskId = parseInt(task.id);
+        try {
+            await fetch(`/api/tasks/${taskId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ progress: Math.round(progress * 100) })
+            });
+            if (window.ganttApp && window.ganttApp.currentProjectId) await window.ganttApp.loadProjectTasks();
+        } catch (e) {
+            console.error('更新进度失败:', e);
+            this.gantt.refresh(this.tasks);
+        }
+    }
+
+    // ── 依赖模式 ──────────────────────────────────
+    enterDependencyMode() {
+        this.dependencyMode = true; this.dependencySourceTaskId = null;
+        this.container.addEventListener('click', this._handleDepClick);
+        this.container.style.cursor = 'crosshair';
+    }
+
+    exitDependencyMode() {
+        this.dependencyMode = false; this.dependencySourceTaskId = null;
+        this.container.removeEventListener('click', this._handleDepClick);
+        this.container.style.cursor = '';
+        document.querySelectorAll('.bar').forEach(b => { b.style.stroke = ''; b.style.strokeWidth = ''; });
+    }
+
+    _handleDepClick = (event) => {
+        if (!this.dependencyMode) return;
+        let target = event.target;
+        while (target && !target.classList.contains('bar-wrapper')) target = target.parentElement;
+        if (!target) return;
+        const taskId = parseInt(target.dataset.id);
+        if (!taskId) return;
+
+        if (this.dependencySourceTaskId === null) {
+            this.dependencySourceTaskId = taskId;
+            const bar = document.querySelector(`.bar-wrapper[data-id="${taskId}"] .bar`);
+            if (bar) { bar.style.stroke = '#3498db'; bar.style.strokeWidth = '3px'; }
+        } else {
+            if (this.dependencySourceTaskId === taskId) { alert('不能选择相同的任务'); this.exitDependencyMode(); return; }
+            this._createDependency(this.dependencySourceTaskId, taskId);
+            this.exitDependencyMode();
+        }
+    }
+
+    async _createDependency(predecessorId, successorId) {
+        try {
+            const r = await fetch(`/api/tasks/${successorId}/dependencies`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ predecessor_id: predecessorId })
+            });
+            if (r.ok) {
+                if (window.ganttApp && window.ganttApp.currentProjectId) await window.ganttApp.loadProjectTasks();
             } else {
-                const error = await response.json();
-                alert(`创建依赖关系失败: ${error.error || '未知错误'}`);
+                const e = await r.json();
+                alert(`创建依赖失败: ${e.error || '未知错误'}`);
             }
-        } catch (error) {
-            console.error('创建依赖关系失败:', error);
-            alert('创建依赖关系失败，请检查网络连接');
-        }
-    }
-    
-    // 跳转到今天
-    scrollToToday() {
-        if (!this.gantt) return;
-        const today = new Date();
-        this.gantt.scroll_to_date(today);
-    }
-    
-    // 放大
-    zoomIn() {
-        if (!this.gantt) return;
-        const currentWidth = this.gantt.options.column_width;
-        if (currentWidth < 60) {
-            this.gantt.change_options({
-                column_width: currentWidth + 5
-            });
-        }
-    }
-    
-    // 缩小
-    zoomOut() {
-        if (!this.gantt) return;
-        const currentWidth = this.gantt.options.column_width;
-        if (currentWidth > 15) {
-            this.gantt.change_options({
-                column_width: currentWidth - 5
-            });
+        } catch (e) {
+            console.error('创建依赖失败:', e);
         }
     }
 }
 
-// note: initialization now happens in main.js when DOMContentLoaded fires
-// class GanttManager remains a standalone module that can be instantiated
-// by the main application.  controls for zoom/today are wired up there as well.
+// 初始化由 main.js DOMContentLoaded 触发

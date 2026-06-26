@@ -13,7 +13,12 @@ class GanttApp {
 
         // ganttManager will be assigned after DOM is ready; see bottom of file
         this.ganttManager = null;
-        
+
+        // Undo/redo stacks
+        this.undoStack = [];
+        this.redoStack = [];
+        this.maxUndo = 50;
+
         this.initializeElements();
         this.bindEvents();
         this.loadProjects();
@@ -31,8 +36,6 @@ class GanttApp {
         
         // 甘特图相关
         this.ganttChart = document.getElementById('gantt-chart');
-        this.zoomInBtn = document.getElementById('zoom-in-btn');
-        this.zoomOutBtn = document.getElementById('zoom-out-btn');
         this.todayBtn = document.getElementById('today-btn');
         
         // 视图控制
@@ -89,6 +92,18 @@ class GanttApp {
         this.editProjectDescriptionInput = document.getElementById('edit-project-description');
         this.saveProjectBtn = document.getElementById('save-project-btn');
         this.deleteProjectBtn = document.getElementById('delete-project-btn');
+
+        // 搜索
+        this.taskSearchInput = document.getElementById('task-search');
+
+        // 里程碑
+        this.taskMilestoneCheckbox = document.getElementById('task-milestone');
+
+        // 骨架屏
+        this.treeSkeleton = document.getElementById('tree-skeleton');
+
+        // 快捷键提示
+        this.shortcutsHint = document.getElementById('shortcuts-hint');
     }
     
     bindEvents() {
@@ -140,6 +155,15 @@ class GanttApp {
         // 项目编辑
         this.saveProjectBtn.addEventListener('click', () => this.saveProject());
         this.deleteProjectBtn.addEventListener('click', () => this.deleteProject());
+
+        // 搜索
+        this.taskSearchInput.addEventListener('input', () => this.onSearchInput());
+
+        // 里程碑复选框
+        this.taskMilestoneCheckbox.addEventListener('change', () => this.onMilestoneToggle());
+
+        // 键盘快捷键
+        document.addEventListener('keydown', (e) => this.handleKeyboard(e));
     }
     
     // API 调用辅助函数
@@ -171,11 +195,13 @@ class GanttApp {
     }
     
     showLoading() {
-        this.loadingOverlay.style.display = 'flex';
+        if (this.treeSkeleton) this.treeSkeleton.style.display = 'block';
+        if (this.taskTree) this.taskTree.style.display = 'none';
     }
-    
+
     hideLoading() {
-        this.loadingOverlay.style.display = 'none';
+        if (this.treeSkeleton) this.treeSkeleton.style.display = 'none';
+        if (this.taskTree) this.taskTree.style.display = '';
     }
     
     // 项目相关方法
@@ -425,7 +451,8 @@ class GanttApp {
         });
         
         return sortedTasks.map(task => {
-            const cls = task.has_children ? 'summary-task' : '';
+            let cls = task.has_children ? 'summary-task' : '';
+            if (task.is_milestone) cls += ' milestone-task';
             // add color-specific class
             const colorClass = `task-color-${task.id}`;
             return {
@@ -520,8 +547,10 @@ class GanttApp {
         this.taskEndDateInput.value = endDate.toISOString().split('T')[0];
         
         this.taskDurationInput.value = 3;
+        this.taskDurationInput.removeAttribute('readonly');
         this.taskProgressInput.value = 0;
         this.taskProgressValue.textContent = '0%';
+        this.taskMilestoneCheckbox.checked = false;
         this.taskParentSelect.value = '';
         
         // 更新选项
@@ -544,7 +573,16 @@ class GanttApp {
         this.taskDurationInput.value = task.duration;
         this.taskProgressInput.value = task.progress;
         this.taskProgressValue.textContent = `${task.progress}%`;
-        
+        this.taskMilestoneCheckbox.checked = task.is_milestone || false;
+
+        // 里程碑模式调整
+        if (task.is_milestone) {
+            this.taskDurationInput.value = 0;
+            this.taskDurationInput.setAttribute('readonly', 'readonly');
+        } else {
+            this.taskDurationInput.removeAttribute('readonly');
+        }
+
         // 更新选项
         this.updateTaskFormOptions();
         
@@ -561,55 +599,92 @@ class GanttApp {
         
         const taskId = this.taskIdInput.value;
         const assignee = this.taskAssigneeInput.value;
-        
+        const isMilestone = this.taskMilestoneCheckbox.checked;
+
         // 根据负责人获取颜色
         let taskColor = '#3498db';
         if (assignee) {
             const selectedOption = this.taskAssigneeInput.options[this.taskAssigneeInput.selectedIndex];
             taskColor = selectedOption.dataset.color || '#3498db';
         }
-        
+
         const taskData = {
             project_id: this.currentProjectId,
             name: this.taskNameInput.value,
             description: this.taskDescriptionInput.value,
             assignee: assignee,
             color: taskColor,
+            is_milestone: isMilestone,
             start_date: this.taskStartDateInput.value,
-            end_date: this.taskEndDateInput.value,
-            duration: parseInt(this.taskDurationInput.value),
+            end_date: isMilestone ? this.taskStartDateInput.value : this.taskEndDateInput.value,
+            duration: isMilestone ? 0 : parseInt(this.taskDurationInput.value),
             progress: parseInt(this.taskProgressInput.value),
             parent_id: this.taskParentSelect.value || null
         };
-        
+
         try {
             if (taskId) {
+                // 保存旧任务数据用于撤销
+                const oldTask = this.tasks.find(t => t.id === parseInt(taskId));
+                const oldDeps = await this.apiRequest(`/api/tasks/${taskId}/dependencies`);
+                const oldDepIds = oldDeps.predecessors || [];
+
                 // 更新现有任务
                 await this.apiRequest(`/api/tasks/${taskId}`, 'PUT', taskData);
-                
+
                 // 更新依赖关系
                 const selectedDeps = Array.from(this.taskDependenciesSelect.selectedOptions)
                     .map(opt => parseInt(opt.value))
-                    .filter(id => !isNaN(id)); // 过滤掉空值（"无"选项）
+                    .filter(id => !isNaN(id));
                 await this.updateTaskDependencies(taskId, selectedDeps);
+
+                if (oldTask) {
+                    this.pushUndo('update-task',
+                        async () => {
+                            await this.apiRequest(`/api/tasks/${taskId}`, 'PUT', {
+                                name: oldTask.name, description: oldTask.description,
+                                assignee: oldTask.assignee, color: oldTask.color,
+                                is_milestone: oldTask.is_milestone || false,
+                                start_date: oldTask.start_date, end_date: oldTask.end_date,
+                                duration: oldTask.duration, progress: oldTask.progress,
+                                parent_id: oldTask.parent_id
+                            });
+                            await this.updateTaskDependencies(taskId, oldDepIds);
+                        },
+                        async () => {
+                            await this.apiRequest(`/api/tasks/${taskId}`, 'PUT', taskData);
+                            await this.updateTaskDependencies(taskId, selectedDeps);
+                        }
+                    );
+                }
             } else {
                 // 创建新任务
                 const newTask = await this.apiRequest('/api/tasks/', 'POST', taskData);
-                
+
                 // 添加依赖关系
                 const selectedDeps = Array.from(this.taskDependenciesSelect.selectedOptions)
                     .map(opt => parseInt(opt.value))
-                    .filter(id => !isNaN(id)); // 过滤掉空值（"无"选项）
+                    .filter(id => !isNaN(id));
                 for (const depId of selectedDeps) {
                     await this.apiRequest(`/api/tasks/${newTask.id}/dependencies`, 'POST', {
                         predecessor_id: depId
                     });
                 }
+
+                const createdId = newTask.id;
+                this.pushUndo('create-task',
+                    async () => { await this.apiRequest(`/api/tasks/${createdId}`, 'DELETE'); },
+                    async () => {
+                        const t = await this.apiRequest('/api/tasks/', 'POST', taskData);
+                        for (const depId of selectedDeps) {
+                            await this.apiRequest(`/api/tasks/${t.id}/dependencies`, 'POST', { predecessor_id: depId });
+                        }
+                    }
+                );
             }
-            
+
             await this.loadProjectTasks();
             this.closeEditSidebar();
-            alert('任务保存成功！');
         } catch (error) {
             console.error('保存任务失败:', error);
         }
@@ -640,16 +715,45 @@ class GanttApp {
     async deleteCurrentTask() {
         const taskId = this.taskIdInput.value;
         if (!taskId) return;
-        
-        if (!confirm('确定要删除这个任务吗？此操作无法撤销。')) {
+
+        if (!confirm('确定要删除这个任务吗？')) {
             return;
         }
-        
+
+        // 保存任务数据用于撤销
+        const taskToDelete = this.tasks.find(t => t.id === parseInt(taskId));
+        const deps = await this.apiRequest(`/api/tasks/${taskId}/dependencies`);
+        const depIds = deps.predecessors || [];
+
         try {
             await this.apiRequest(`/api/tasks/${taskId}`, 'DELETE');
+
+            if (taskToDelete) {
+                this.pushUndo('delete-task',
+                    async () => {
+                        const restored = await this.apiRequest('/api/tasks/', 'POST', {
+                            project_id: taskToDelete.project_id,
+                            parent_id: taskToDelete.parent_id,
+                            name: taskToDelete.name,
+                            description: taskToDelete.description,
+                            assignee: taskToDelete.assignee,
+                            color: taskToDelete.color,
+                            is_milestone: taskToDelete.is_milestone || false,
+                            start_date: taskToDelete.start_date,
+                            end_date: taskToDelete.end_date,
+                            duration: taskToDelete.duration,
+                            progress: taskToDelete.progress
+                        });
+                        for (const depId of depIds) {
+                            await this.apiRequest(`/api/tasks/${restored.id}/dependencies`, 'POST', { predecessor_id: depId });
+                        }
+                    },
+                    async () => { await this.apiRequest(`/api/tasks/${taskId}`, 'DELETE'); }
+                );
+            }
+
             await this.loadProjectTasks();
             this.closeEditSidebar();
-            alert('任务删除成功！');
         } catch (error) {
             console.error('删除任务失败:', error);
         }
@@ -965,8 +1069,8 @@ class GanttApp {
             }
             const cls = `task-color-${task.id}`;
             const textColor = this.isDarkColor(color) ? '#fff' : '#000';
-            css += `.${cls} .bar { fill: ${color}; }\n`;
-            css += `.${cls} .bar-label { fill: ${textColor}; }\n`;
+            css += `.${cls} .bar { fill: ${color} !important; }\n`;
+            css += `.${cls} .bar-label { fill: ${textColor} !important; }\n`;
         });
         style.innerHTML = css;
     }    
@@ -1017,6 +1121,89 @@ class GanttApp {
         }
     }
     
+    // ==================== 撤销/重做 ====================
+    pushUndo(action, undoFn, redoFn) {
+        this.undoStack.push({ action, undoFn, redoFn });
+        if (this.undoStack.length > this.maxUndo) this.undoStack.shift();
+        this.redoStack = [];
+    }
+
+    async undo() {
+        if (this.undoStack.length === 0) return;
+        const record = this.undoStack.pop();
+        try {
+            await record.undoFn();
+            this.redoStack.push(record);
+            if (this.currentProjectId === 'all') await this.loadAllTasks();
+            else if (this.currentProjectId) await this.loadProjectTasks();
+        } catch (e) {
+            console.error('撤销失败:', e);
+            this.undoStack.push(record);
+        }
+    }
+
+    async redo() {
+        if (this.redoStack.length === 0) return;
+        const record = this.redoStack.pop();
+        try {
+            await record.redoFn();
+            this.undoStack.push(record);
+            if (this.currentProjectId === 'all') await this.loadAllTasks();
+            else if (this.currentProjectId) await this.loadProjectTasks();
+        } catch (e) {
+            console.error('重做失败:', e);
+            this.redoStack.push(record);
+        }
+    }
+
+    // ==================== 键盘快捷键 ====================
+    handleKeyboard(e) {
+        // 不在输入框中处理快捷键
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') {
+            if (e.key === 'Escape') { e.target.blur(); return; }
+            return;
+        }
+
+        if (e.ctrlKey && e.key === 'z') { e.preventDefault(); this.undo(); return; }
+        if (e.ctrlKey && e.key === 'y') { e.preventDefault(); this.redo(); return; }
+        if (e.ctrlKey && e.key === 's') { e.preventDefault(); this.saveAllChanges(); return; }
+        if (e.key === 'Delete') {
+            e.preventDefault();
+            if (this.selectedTaskId) this.deleteCurrentTask();
+            return;
+        }
+        if (e.key === 'Escape') {
+            if (this.editSidebar.classList.contains('open')) { this.closeEditSidebar(); return; }
+            if (this.addPersonModal.classList.contains('open')) { this.closeModal(); return; }
+            if (this.editProjectModal.classList.contains('open')) { this.closeModal(); return; }
+            if (this.personManagementSidebar.classList.contains('open')) { this.closePersonManagementSidebar(); return; }
+            if (this.dependencyMode) { this.cancelDependencyMode(); return; }
+        }
+    }
+
+    // ==================== 搜索 ====================
+    onSearchInput() {
+        const query = this.taskSearchInput.value.trim().toLowerCase();
+        if (window.taskTreeManager) {
+            window.taskTreeManager.setFilter(query);
+        }
+    }
+
+    // ==================== 里程碑切换 ====================
+    onMilestoneToggle() {
+        const isMilestone = this.taskMilestoneCheckbox.checked;
+        if (isMilestone) {
+            this.taskDurationInput.value = 0;
+            this.taskDurationInput.setAttribute('readonly', 'readonly');
+            this.taskEndDateInput.value = this.taskStartDateInput.value;
+            this.taskProgressInput.value = 0;
+            this.taskProgressValue.textContent = '0%';
+        } else {
+            this.taskDurationInput.removeAttribute('readonly');
+            this.updateDuration();
+        }
+    }
+
     // 导出甘特图为图片
     async exportAsImage() {
         if (!this.currentProjectId) {
@@ -1063,16 +1250,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // 建立一个基础图表，这会用到一个占位任务以防库计算出 null
     window.ganttManager.init();
 
-    // 绑定控制按钮给甘特图管理器
-    const zoomInBtn = document.getElementById('zoom-in-btn');
-    const zoomOutBtn = document.getElementById('zoom-out-btn');
+    // 绑定今天按钮 + Ctrl+滚轮缩放
     const todayBtn = document.getElementById('today-btn');
-    if (zoomInBtn) zoomInBtn.addEventListener('click', () => window.ganttManager.zoomIn());
-    if (zoomOutBtn) zoomOutBtn.addEventListener('click', () => window.ganttManager.zoomOut());
     if (todayBtn) todayBtn.addEventListener('click', () => window.ganttManager.scrollToToday());
+    const ganttContainer = document.querySelector('.gantt-container');
+    if (ganttContainer) ganttContainer.addEventListener('wheel', (e) => window.ganttManager.handleWheelZoom(e), { passive: false });
 
     window.ganttApp = new GanttApp();
-
-    // 把已经创建的 ganttManager 引入应用
     window.ganttApp.ganttManager = window.ganttManager;
+
+    // 页面打开后自动滚动到今天
+    setTimeout(() => window.ganttManager.scrollToToday(), 800);
 });

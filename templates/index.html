@@ -3,12 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ganπ项目管理工具</title>
+    <title>甘特图项目管理工具</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <!-- 本地缓存的 FontAwesome 图标和甘特图库样式 -->
     <link rel="stylesheet" href="{{ url_for('static', filename='lib/font-awesome.min.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='lib/frappe-gantt.css') }}">
-
     <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='image/apple-touch-icon.png') }}">
     <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='image/favicon-32x32.png') }}">
     <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='image/favicon-16x16.png') }}">
@@ -29,27 +27,27 @@
                     <button id="new-project-btn" class="btn btn-primary">
                         <i class="fas fa-plus"></i> 新建项目
                     </button>
-                    <button id="edit-project-btn" class="btn btn-secondary" title="编辑项目">
+                    <button id="edit-project-btn" class="btn btn-secondary" data-tooltip="编辑项目">
                         <i class="fas fa-edit"></i>
                     </button>
                 </div>
             </div>
             <div class="header-right">
                 <div class="view-controls">
-                    <button class="btn btn-icon" data-view="day" title="日视图">
+                    <button class="btn btn-icon" data-view="day" data-tooltip="日视图">
                         <i class="fas fa-calendar-day"></i> 日
                     </button>
-                    <button class="btn btn-icon active" data-view="week" title="周视图">
+                    <button class="btn btn-icon active" data-view="week" data-tooltip="周视图">
                         <i class="fas fa-calendar-week"></i> 周
                     </button>
-                    <button class="btn btn-icon" data-view="month" title="月视图">
+                    <button class="btn btn-icon" data-view="month" data-tooltip="月视图">
                         <i class="fas fa-calendar-alt"></i> 月
                     </button>
                 </div>
                 <button id="export-btn" class="btn btn-secondary">
                     <i class="fas fa-download"></i> 导出图片
                 </button>
-                <button id="save-btn" class="btn btn-success">
+                <button id="save-btn" class="btn btn-success" data-tooltip="Ctrl+S">
                     <i class="fas fa-save"></i> 保存
                 </button>
                 <button id="critical-path-btn" class="btn btn-warning">
@@ -63,17 +61,37 @@
             <!-- 左侧任务树面板 -->
             <aside class="task-tree-panel">
                 <div class="panel-header">
-                    <h3>任务列表</h3>
-                    <button id="add-task-btn" class="btn btn-sm btn-primary">
-                        <i class="fas fa-plus"></i> 添加任务
-                    </button>
+                    <div class="panel-header-row">
+                        <h3>任务列表</h3>
+                        <button id="add-task-btn" class="btn btn-sm btn-primary">
+                            <i class="fas fa-plus"></i> 添加任务
+                        </button>
+                    </div>
+                    <input type="text" id="task-search" class="task-search-input" placeholder="搜索任务名称或负责人...">
                 </div>
                 <div class="task-tree-container">
+                    <!-- 骨架屏 -->
+                    <div id="tree-skeleton" class="skeleton-tree" style="display:none;">
+                        <div class="skeleton-tree-item"><div class="skeleton-bar skeleton"></div><div class="skeleton-bar skeleton" style="width:40px;"></div></div>
+                        <div class="skeleton-tree-item" style="margin-left:20px;"><div class="skeleton-bar skeleton"></div><div class="skeleton-bar skeleton" style="width:40px;"></div></div>
+                        <div class="skeleton-tree-item"><div class="skeleton-bar skeleton"></div><div class="skeleton-bar skeleton" style="width:40px;"></div></div>
+                        <div class="skeleton-tree-item" style="margin-left:20px;"><div class="skeleton-bar skeleton"></div><div class="skeleton-bar skeleton" style="width:40px;"></div></div>
+                        <div class="skeleton-tree-item"><div class="skeleton-bar skeleton"></div><div class="skeleton-bar skeleton" style="width:40px;"></div></div>
+                    </div>
                     <div id="task-tree" class="task-tree">
-                        <!-- 任务树将通过JavaScript动态生成 -->
                         <div class="empty-state">
-                            <i class="fas fa-tasks"></i>
-                            <p>暂无任务，请先创建项目或添加任务</p>
+                            <div class="empty-icon">
+                                <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <rect x="8" y="8" width="20" height="16" rx="2" stroke="#bdc3c7" stroke-width="2" fill="none"/>
+                                    <rect x="32" y="8" width="24" height="16" rx="2" stroke="#bdc3c7" stroke-width="2" fill="none"/>
+                                    <rect x="8" y="30" width="14" height="16" rx="2" stroke="#bdc3c7" stroke-width="2" fill="none"/>
+                                    <rect x="26" y="30" width="30" height="16" rx="2" stroke="#bdc3c7" stroke-width="2" fill="none"/>
+                                    <rect x="8" y="52" width="10" height="4" rx="1" fill="#bdc3c7" opacity="0.5"/>
+                                    <rect x="8" y="52" width="4" height="4" rx="1" fill="#3498db"/>
+                                </svg>
+                            </div>
+                            <h4>暂无任务</h4>
+                            <p>请先创建项目，然后点击「添加任务」开始规划</p>
                         </div>
                     </div>
                 </div>
@@ -84,28 +102,23 @@
                 <div class="panel-header">
                     <h3>甘特图</h3>
                     <div class="gantt-controls">
-                        <button id="zoom-in-btn" class="btn btn-sm btn-icon" title="放大">
-                            <i class="fas fa-search-plus"></i>
-                        </button>
-                        <button id="zoom-out-btn" class="btn btn-sm btn-icon" title="缩小">
-                            <i class="fas fa-search-minus"></i>
-                        </button>
-                        <button id="today-btn" class="btn btn-sm btn-secondary" title="跳转到今天">
+                        <button id="today-btn" class="btn btn-sm btn-secondary" data-tooltip="跳转到今天">
                             <i class="fas fa-calendar-check"></i> 今天
                         </button>
                     </div>
                 </div>
                 <div class="gantt-container">
                     <div id="gantt-chart"></div>
+                    <div class="today-line" id="today-line" style="display:none;"></div>
                 </div>
             </section>
         </main>
 
-        <!-- 任务编辑侧边栏（默认隐藏） -->
+        <!-- 任务编辑侧边栏 -->
         <aside class="edit-sidebar" id="edit-sidebar">
             <div class="sidebar-header">
                 <h3>编辑任务</h3>
-                <button class="btn btn-icon close-sidebar">
+                <button class="btn btn-icon close-sidebar" data-tooltip="关闭 (Esc)">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
@@ -113,32 +126,39 @@
                 <form id="task-form">
                     <input type="hidden" id="task-id">
                     <input type="hidden" id="task-project-id">
-                    
+
                     <div class="form-group">
                         <label for="task-name">任务名称</label>
                         <input type="text" id="task-name" class="form-control" required>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="task-description">描述</label>
                         <textarea id="task-description" class="form-control" rows="3"></textarea>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="task-assignee">负责人</label>
                         <div class="assignee-selector">
                             <select id="task-assignee" class="form-control">
                                 <option value="">请选择负责人...</option>
                             </select>
-                            <button type="button" id="edit-person-btn" class="btn btn-sm btn-secondary" title="编辑负责人">
+                            <button type="button" id="edit-person-btn" class="btn btn-sm btn-secondary" data-tooltip="编辑负责人">
                                 <i class="fas fa-edit"></i>
                             </button>
-                            <button type="button" id="add-person-btn" class="btn btn-sm btn-secondary" title="新增人员">
+                            <button type="button" id="add-person-btn" class="btn btn-sm btn-secondary" data-tooltip="新增人员">
                                 <i class="fas fa-plus"></i>
                             </button>
                         </div>
                     </div>
-                    
+
+                    <div class="form-group">
+                        <label class="form-check">
+                            <input type="checkbox" id="task-milestone">
+                            <span class="form-check-label">里程碑任务（工期为 0，甘特图显示为菱形标记）</span>
+                        </label>
+                    </div>
+
                     <div class="form-row">
                         <div class="form-group">
                             <label for="task-start-date">开始日期</label>
@@ -149,57 +169,52 @@
                             <input type="date" id="task-end-date" class="form-control" required>
                         </div>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="task-duration">工期（天）</label>
-                        <input type="number" id="task-duration" class="form-control" min="1" readonly>
+                        <input type="number" id="task-duration" class="form-control" min="0" readonly>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="task-progress">进度 (%)</label>
                         <input type="range" id="task-progress" class="form-control-range" min="0" max="100" step="5">
                         <span id="progress-value">0%</span>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="task-parent">父任务</label>
                         <select id="task-parent" class="form-control">
                             <option value="">无（顶级任务）</option>
                         </select>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="task-dependencies">前置任务</label>
                         <select id="task-dependencies" class="form-control" multiple>
-                            <!-- 前置任务选项将通过JavaScript动态生成 -->
                         </select>
                         <small class="form-text">按住 Ctrl 键可多选</small>
                     </div>
-                    
+
                     <div class="form-actions">
                         <button type="submit" class="btn btn-primary">保存任务</button>
-                        <button type="button" id="delete-task-btn" class="btn btn-danger">删除任务</button>
+                        <button type="button" id="delete-task-btn" class="btn btn-danger">删除任务 (Delete)</button>
                         <button type="button" class="btn btn-secondary close-sidebar">取消</button>
                     </div>
                 </form>
             </div>
         </aside>
 
-        <!-- 依赖关系创建提示（连接线模式） -->
+        <!-- 依赖关系创建提示 -->
         <div class="dependency-mode" id="dependency-mode" style="display: none;">
             <div class="dependency-mode-indicator">
                 <i class="fas fa-link"></i>
-                <span>连接线模式：点击一个任务作为前置任务，再点击另一个任务作为后继任务</span>
-                <button id="cancel-dependency-btn" class="btn btn-sm btn-secondary">取消</button>
+                <span>连接线模式：点击前置任务 → 再点击后继任务</span>
+                <button id="cancel-dependency-btn" class="btn btn-sm btn-secondary">取消 (Esc)</button>
             </div>
         </div>
 
         <!-- 加载遮罩 -->
         <div class="loading-overlay" id="loading-overlay">
-            <div class="loading-spinner">
-                <i class="fas fa-spinner fa-spin"></i>
-                <p>加载中...</p>
-            </div>
         </div>
 
         <!-- 新增人员弹窗 -->
@@ -207,7 +222,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h3>新增负责人</h3>
-                    <button class="btn btn-icon modal-close">
+                    <button class="btn btn-icon modal-close" data-tooltip="关闭">
                         <i class="fas fa-times"></i>
                     </button>
                 </div>
@@ -218,7 +233,7 @@
                     </div>
                     <div class="form-group">
                         <label for="new-person-color">颜色</label>
-                        <input type="color" id="new-person-color" class="form-control-color" value="#3498db" title="选择负责人颜色">
+                        <input type="color" id="new-person-color" class="form-control-color" value="#3498db">
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -232,7 +247,7 @@
         <aside class="person-management-sidebar" id="person-management-sidebar">
             <div class="sidebar-header">
                 <h3>负责人管理</h3>
-                <button class="btn btn-icon close-sidebar" id="close-person-sidebar">
+                <button class="btn btn-icon close-sidebar" id="close-person-sidebar" data-tooltip="关闭">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
@@ -243,16 +258,24 @@
         </aside>
 
         <!-- 负责人管理按钮 -->
-        <button class="person-management-btn" id="person-management-btn" title="负责人管理">
+        <button class="person-management-btn" id="person-management-btn" data-tooltip="负责人管理">
             <i class="fas fa-users"></i>
         </button>
+
+        <!-- 快捷键提示 -->
+        <div class="shortcuts-hint" id="shortcuts-hint">
+            <span><kbd>Ctrl+Z</kbd> 撤销</span>
+            <span><kbd>Ctrl+Y</kbd> 重做</span>
+            <span><kbd>Delete</kbd> 删除</span>
+            <span><kbd>Esc</kbd> 关闭</span>
+        </div>
 
         <!-- 项目编辑弹窗 -->
         <div class="modal" id="edit-project-modal">
             <div class="modal-content">
                 <div class="modal-header">
                     <h3>编辑项目</h3>
-                    <button class="btn btn-icon modal-close">
+                    <button class="btn btn-icon modal-close" data-tooltip="关闭">
                         <i class="fas fa-times"></i>
                     </button>
                 </div>
@@ -263,7 +286,7 @@
                     </div>
                     <div class="form-group">
                         <label for="edit-project-color">项目颜色</label>
-                        <input type="color" id="edit-project-color" class="form-control-color" value="#3498db" title="选择项目颜色">
+                        <input type="color" id="edit-project-color" class="form-control-color" value="#3498db">
                     </div>
                     <div class="form-group">
                         <label for="edit-project-description">项目描述</label>
@@ -279,8 +302,7 @@
         </div>
     </div>
 
-    <!-- JavaScript 文件 -->
-    <!-- 本地缓存的甘特图库脚本 -->
+    <!-- JavaScript -->
     <script src="{{ url_for('static', filename='lib/frappe-gantt.min.js') }}"></script>
     <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>

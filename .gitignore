@@ -5,3 +5,4 @@
 /routes/__pycache__
 *.db
 *.py[cod]
+/backups/

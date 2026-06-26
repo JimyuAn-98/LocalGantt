@@ -2,16 +2,27 @@ version: "3.9"
 
 services:
   gantt:
-    build: .                    # build using the Dockerfile above
-    image: gantt:latest         # optional tag
+    build: .
+    image: gantt:latest
     container_name: gantt_app
+    restart: unless-stopped
     ports:
-      - "1258:1258"            # map to host
+      - "1258:1258"
     volumes:
-      - .:/app                  # bind‑mount source (dev convenience)
+      - gantt_data:/app/data
     environment:
-      - FLASK_ENV=development
+      - FLASK_ENV=production
       - FLASK_APP=app.py
       - FLASK_RUN_HOST=0.0.0.0
       - FLASK_RUN_PORT=1258
-    command: python app.py      # entrypoint to start the server
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:1258/api/version"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    command: python app.py
+
+volumes:
+  gantt_data:
+    name: gantt_data

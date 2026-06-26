@@ -7,12 +7,57 @@ class TaskTreeManager {
         this.childrenMap = new Map(); // parent_id -> [child_tasks]
         this.expandedNodes = new Set();
         this.selectedTaskId = null;
-        
+        this.filterText = '';
+
         // 初始化空状态
         this.renderEmptyState();
-        
+
         // 保存到全局变量
         window.taskTreeManager = this;
+    }
+
+    // 设置搜索过滤
+    setFilter(text) {
+        this.filterText = text;
+        if (this.tasks.length === 0) return;
+        this.buildTaskMaps(this.tasks);
+        // 搜索时自动展开所有匹配节点
+        if (text) {
+            this.expandedNodes.clear();
+            this.tasks.forEach(task => {
+                if (this.taskMatchesFilter(task)) {
+                    // 展开所有祖先
+                    let current = task;
+                    while (current.parent_id) {
+                        this.expandedNodes.add(current.parent_id);
+                        current = this.taskMap.get(current.parent_id);
+                        if (!current) break;
+                    }
+                }
+            });
+        }
+        this.renderTaskTree();
+        if (this.selectedTaskId) {
+            this.selectTask(this.selectedTaskId);
+        }
+    }
+
+    // 检查任务是否匹配过滤
+    taskMatchesFilter(task) {
+        if (!this.filterText) return true;
+        const name = (task.name || '').toLowerCase();
+        const assignee = (task.assignee || '').toLowerCase();
+        const q = this.filterText;
+        return name.includes(q) || assignee.includes(q);
+    }
+
+    // 检查任务或其子任务是否匹配（用于父节点可见性）
+    taskOrChildrenMatch(taskId) {
+        const task = this.taskMap.get(taskId);
+        if (!task) return false;
+        if (this.taskMatchesFilter(task)) return true;
+        const children = this.childrenMap.get(taskId) || [];
+        return children.some(child => this.taskOrChildrenMatch(child.id));
     }
     
     // 更新任务树数据
@@ -69,28 +114,48 @@ class TaskTreeManager {
     renderEmptyState() {
         this.container.innerHTML = `
             <div class="empty-state">
-                <i class="fas fa-tasks"></i>
-                <p>暂无任务，请先创建项目或添加任务</p>
+                <div class="empty-icon">
+                    <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="8" y="8" width="20" height="16" rx="2" stroke="#bdc3c7" stroke-width="2" fill="none"/>
+                        <rect x="32" y="8" width="24" height="16" rx="2" stroke="#bdc3c7" stroke-width="2" fill="none"/>
+                        <rect x="8" y="30" width="14" height="16" rx="2" stroke="#bdc3c7" stroke-width="2" fill="none"/>
+                        <rect x="26" y="30" width="30" height="16" rx="2" stroke="#bdc3c7" stroke-width="2" fill="none"/>
+                        <rect x="8" y="52" width="10" height="4" rx="1" fill="#bdc3c7" opacity="0.5"/>
+                        <rect x="8" y="52" width="4" height="4" rx="1" fill="#3498db"/>
+                    </svg>
+                </div>
+                <h4>暂无任务</h4>
+                <p>请先创建项目，然后点击「添加任务」开始规划</p>
             </div>
         `;
     }
-    
+
     // 渲染任务树
     renderTaskTree() {
         // 获取根任务（没有父任务的任务）
         const rootTasks = this.tasks.filter(task => !task.parent_id);
-        
+
         // 按开始日期排序根任务
         rootTasks.sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
-        
+
+        // 过滤：只显示匹配或子任务匹配的根任务
+        let visibleRoots = rootTasks;
+        if (this.filterText) {
+            visibleRoots = rootTasks.filter(task => this.taskOrChildrenMatch(task.id));
+        }
+
         // 生成HTML
         let html = '';
-        rootTasks.forEach(task => {
+        visibleRoots.forEach(task => {
             html += this.renderTaskNode(task, 0);
         });
-        
+
+        if (this.filterText && visibleRoots.length === 0) {
+            html = '<div class="search-no-results">未找到匹配的任务</div>';
+        }
+
         this.container.innerHTML = html;
-        
+
         // 绑定事件
         this.bindEvents();
     }
@@ -128,6 +193,7 @@ class TaskTreeManager {
                             <i class="fas fa-chevron-${isExpanded ? 'down' : 'right'} expand-icon" style="margin-right: 6px; cursor: pointer; font-size: 12px;"></i>
                         ` : '<span style="display: inline-block; width: 18px;"></span>'}
                         <span class="task-name">${task.name}</span>
+                        ${task.is_milestone ? '<span class="milestone-badge" style="font-size:10px;color:#f39c12;margin-left:4px;" title="里程碑">&#9670;</span>' : ''}
                         ${projectBadge}
                         ${task.assignee ? `<span class="task-assignee" style="font-size: 11px; color: #7f8c8d; margin-left: 8px;">(${task.assignee})</span>` : ''}
                     </div>
@@ -144,11 +210,18 @@ class TaskTreeManager {
         // 如果有子任务且已展开，渲染子任务
         if (hasChildren && isExpanded) {
             const children = this.childrenMap.get(taskId);
-            html += `<div class="task-node-children">`;
-            children.forEach(child => {
-                html += this.renderTaskNode(child, level + 1);
-            });
-            html += `</div>`;
+            // 过滤子任务
+            let visibleChildren = children;
+            if (this.filterText) {
+                visibleChildren = children.filter(child => this.taskOrChildrenMatch(child.id));
+            }
+            if (visibleChildren.length > 0) {
+                html += `<div class="task-node-children">`;
+                visibleChildren.forEach(child => {
+                    html += this.renderTaskNode(child, level + 1);
+                });
+                html += `</div>`;
+            }
         }
         
         return html;

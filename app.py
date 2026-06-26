@@ -21,52 +21,51 @@ def create_app():
     # Create tables if they don't exist
     with app.app_context():
         db.create_all()
-        # ensure color column exists on tasks and projects tables (simple migration)
+        # Simple migrations — SQLAlchemy 2.x compatible
         from sqlalchemy import inspect, text
         inspector = inspect(db.engine)
-        
+
+        def run_sql(sql, desc):
+            try:
+                with db.engine.connect() as conn:
+                    conn.execute(text(sql))
+                    conn.commit()
+                print(desc)
+            except Exception as e:
+                print(f'Migration skipped ({desc}): {e}')
+
         # Check tasks table
         if inspector.has_table('tasks'):
             task_cols = [c['name'] for c in inspector.get_columns('tasks')]
             if 'color' not in task_cols:
-                try:
-                    db.engine.execute(text("ALTER TABLE tasks ADD COLUMN color VARCHAR(7) DEFAULT '#3498db'"))
-                    print('Added color column to tasks table')
-                except Exception as e:
-                    print('Failed to alter tasks table to add color column:', e)
-        
+                run_sql("ALTER TABLE tasks ADD COLUMN color VARCHAR(7) DEFAULT '#3498db'",
+                        'Added color column to tasks table')
+            if 'is_milestone' not in task_cols:
+                run_sql("ALTER TABLE tasks ADD COLUMN is_milestone BOOLEAN DEFAULT 0",
+                        'Added is_milestone column to tasks table')
+
         # Check projects table
         if inspector.has_table('projects'):
             project_cols = [c['name'] for c in inspector.get_columns('projects')]
             if 'color' not in project_cols:
-                try:
-                    db.engine.execute(text("ALTER TABLE projects ADD COLUMN color VARCHAR(7) DEFAULT '#3498db'"))
-                    print('Added color column to projects table')
-                except Exception as e:
-                    print('Failed to alter projects table to add color column:', e)
-        
-        # Check persons table (new for this feature)
+                run_sql("ALTER TABLE projects ADD COLUMN color VARCHAR(7) DEFAULT '#3498db'",
+                        'Added color column to projects table')
+
+        # Check persons table
         if not inspector.has_table('persons'):
-            try:
-                db.engine.execute(text("""
-                    CREATE TABLE persons (
-                        id INTEGER PRIMARY KEY,
-                        name VARCHAR(100) NOT NULL UNIQUE,
-                        color VARCHAR(7) DEFAULT '#3498db',
-                        created_at TIMESTAMP
-                    )
-                """))
-                print('Created persons table')
-            except Exception as e:
-                print('Failed to create persons table:', e)
+            run_sql("""
+                CREATE TABLE persons (
+                    id INTEGER PRIMARY KEY,
+                    name VARCHAR(100) NOT NULL UNIQUE,
+                    color VARCHAR(7) DEFAULT '#3498db',
+                    created_at TIMESTAMP
+                )
+            """, 'Created persons table')
         else:
             person_cols = [c['name'] for c in inspector.get_columns('persons')]
             if 'color' not in person_cols:
-                try:
-                    db.engine.execute(text("ALTER TABLE persons ADD COLUMN color VARCHAR(7) DEFAULT '#3498db'"))
-                    print('Added color column to persons table')
-                except Exception as e:
-                    print('Failed to alter persons table to add color column:', e)
+                run_sql("ALTER TABLE persons ADD COLUMN color VARCHAR(7) DEFAULT '#3498db'",
+                        'Added color column to persons table')
     
     # Register blueprints (API routes)
     from routes.projects import projects_bp
@@ -80,7 +79,17 @@ def create_app():
     @app.route('/')
     def index():
         return render_template('index.html')
-    
+
+    # Version / health check endpoint
+    @app.route('/api/version')
+    def version():
+        ver = 'unknown'
+        vfile = os.path.join(os.path.dirname(__file__), 'VERSION')
+        if os.path.exists(vfile):
+            with open(vfile) as f:
+                ver = f.read().strip()
+        return {'version': ver, 'status': 'ok'}
+
     return app
 
 if __name__ == '__main__':
