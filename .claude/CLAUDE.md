@@ -4,14 +4,45 @@
 
 ## 运行与开发
 
+**Conda 环境**：`gantt`（Python 3.11.15）
+**Python 路径**：`C:\Users\1\.conda\envs\gantt\python.exe`
+
 ```bash
-pip install -r requirements.txt
-python app.py                      # 启动服务，访问 http://localhost:1258
-python scripts/download_vendor.py  # 首次运行：下载 frappe-gantt + FontAwesome 到本地
-python migrate_db.py               # 手动数据库迁移（通常启动时自动完成）
+# 首次初始化环境
+C:\Users\1\.conda\envs\gantt\python.exe -m pip install -r requirements.txt
+C:\Users\1\.conda\envs\gantt\python.exe scripts/download_vendor.py
+
+# 日常启动
+C:\Users\1\.conda\envs\gantt\python.exe app.py   # 访问 http://localhost:1258
+
+# 数据库迁移（通常启动时自动完成）
+C:\Users\1\.conda\envs\gantt\python.exe migrate_db.py
 ```
 
 Docker：`docker-compose up --build`
+
+## MCP 服务
+
+`mcp_server.py` — MCP Python SDK (FastMCP)，两种传输模式，供 AI agent CRUD 项目数据。
+
+**stdio 模式**（Claude Desktop 等本地 agent 直接 spawn 子进程，无需手动启动）：
+```bash
+C:\Users\1\.conda\envs\gantt\python.exe mcp_server.py
+```
+
+**HTTP 模式**（Chatbox / 远程 agent 通过 URL 连接）：
+```bash
+C:\Users\1\.conda\envs\gantt\python.exe mcp_server.py --transport http
+# 默认 http://127.0.0.1:1259/mcp
+# 自定义: --host 0.0.0.0 --port 1259 --path /mcp
+```
+
+**调试**：
+```bash
+npx @anthropic-ai/mcp-inspector C:\Users\1\.conda\envs\gantt\python.exe mcp_server.py
+```
+
+暴露 20 个工具（5 类）：Project / Task / Person CRUD、Dependency 管理、Analytics。复用 `models.py` + `routes/tasks.py` 业务逻辑。详细配置见 `docs/MCP_SETUP.md`。
 
 ## 架构
 

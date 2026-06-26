@@ -8,6 +8,7 @@ services:
     restart: unless-stopped
     ports:
       - "1258:1258"
+      - "1259:1259"
     volumes:
       - gantt_data:/app/data
     environment:

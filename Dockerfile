@@ -17,10 +17,12 @@ COPY . .
 ARG GIT_COMMIT=unknown
 RUN test -f /app/VERSION || echo "${GIT_COMMIT}" > /app/VERSION
 
-EXPOSE 1258
+RUN chmod +x /app/docker-entrypoint.sh
+
+EXPOSE 1258 1259
 
 ENV FLASK_APP=app.py
 ENV FLASK_RUN_HOST=0.0.0.0
 ENV FLASK_RUN_PORT=1258
 
-CMD ["python", "app.py"]
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
